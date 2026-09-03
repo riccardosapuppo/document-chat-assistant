@@ -17,7 +17,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { api } from './http/api.js';
-import { build, buildAsync, readFolder } from './index/build.js';
+import { buildAsync, readFolder } from './index/build.js';
+import { corpus } from './index/corpus.js';
 import { provider } from './index/embed.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -40,18 +41,26 @@ if (documents.length === 0) {
 
 // The remote provider fetches; the local one does not. Both are awaited so the
 // service never starts answering from a half-built index.
-const index = chosen.needsNetwork
-  ? await buildAsync(documents, { provider: chosen })
-  : build(documents, { provider: chosen });
+if (chosen.needsNetwork) await buildAsync(documents, { provider: chosen });
 
-const app = api({ index, log });
+/**
+ * The documents in play, which is not a fixed set.
+ *
+ * Somebody can drop a document into the console and ask questions about it,
+ * and doing so rebuilds the whole index rather than appending to it -- because
+ * a document is FOUND by names worked out against the whole corpus, and a
+ * fourth document can take a name away from the second. See corpus.js.
+ */
+const held = corpus({ samples: documents, provider: chosen, log });
+
+const app = api({ corpus: held, log });
 
 const server = app.listen(PORT, HOST, () => {
   log('info', 'listening', {
     console: `http://${HOST}:${PORT}`,
-    documents: index.documents.length,
-    pieces: index.chunks.length,
-    embeddings: index.provider,
+    documents: held.index.documents.length,
+    pieces: held.index.chunks.length,
+    embeddings: held.index.provider,
   });
 });
 

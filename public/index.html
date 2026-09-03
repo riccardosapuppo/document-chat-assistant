@@ -68,6 +68,52 @@
         </ul>
       </section>
 
+      <!--
+        The documents in play, and a way to add your own.
+
+        Under the asking rather than above it, deliberately. The three invented
+        manuals are already there and the questions above already work, so
+        somebody who wants to try this does not have to bring anything with
+        them. Whoever wants to use their own document will go looking, and
+        finds it exactly where a second thought goes.
+      -->
+      <details class="panel corpus" id="corpus">
+        <summary>
+          <h2>The documents it is reading</h2>
+          <span class="summary-say" id="corpus-say">three invented manuals</span>
+        </summary>
+
+        <ul class="documents" id="documents"></ul>
+
+        <label class="drop" id="drop">
+          <input id="file" type="file" multiple
+                 accept=".md,.txt,.pdf,text/markdown,text/plain,application/pdf" />
+          <span class="drop-say">
+            <strong>Add your own</strong>
+            <span id="drop-detail">drop a .md, .txt or .pdf here, or click to choose</span>
+          </span>
+        </label>
+
+        <p class="added" id="added" hidden></p>
+
+        <p class="hint">
+          <strong>Nothing is written to disk.</strong> A document you add lives in
+          memory and is gone when this stops &mdash; an upload folder on somebody
+          else&rsquo;s machine is a place to put things that should not be there. A
+          PDF is read for the text it already carries; a scan has none, and says so.
+        </p>
+
+        <p class="hint">
+          Adding a document <strong>rebuilds the whole index</strong>, not only its
+          own part. A document is found by names worked out against the
+          <em>whole</em> corpus &mdash; an ordinary word only becomes a name if it
+          appears nowhere else &mdash; so a fourth document can take a name away
+          from the second, and it should.
+        </p>
+
+        <button type="button" class="quiet" id="reset">back to the three invented manuals</button>
+      </details>
+
       <!-- What the question was taken to be. ------------------------------- -->
       <section class="panel reading" id="reading" hidden>
         <h2>What it made of the question</h2>

@@ -56,6 +56,52 @@ something you can see rather than a claim to take on trust.
 
 ---
 
+## Bring your own document
+
+The three invented manuals answer the questions above, so nothing has to be
+brought along to try this. But a retrieval system is only interesting on text
+somebody actually cares about, so the console takes **`.md`, `.txt` and `.pdf`**
+— dropped on it, or chosen — and indexes them beside the manuals.
+
+A PDF is read for the text it already carries. That reader
+([`src/text/pdf.js`](src/text/pdf.js)) is copied from a sibling project, where
+the argument was that most PDFs already contain their text and recognising it
+from the pixels instead is slower, costs money per page, and gives a worse
+answer than the one that was already there. **A scan has no text to find**, and
+is refused saying exactly that rather than indexed as an empty document.
+
+**Nothing is written to disk.** What you add lives in memory and is gone when
+the service stops. That is not a missing feature: an upload folder on a machine
+somebody else is running is a place to put things that should not be there, and
+this is a demonstration anybody can open.
+
+### Adding a document rebuilds the whole index
+
+Not the new document’s part of it. The whole thing, every time — and that is
+the interesting consequence of how documents are found.
+
+A document’s **names** are worked out against the whole corpus: an ordinary
+word only becomes a name if it appears *nowhere in any other document*. That is
+what makes "and the wide one?" answerable, since the TP-60 opens by calling
+itself wide-format and nothing else in the folder uses the word.
+
+So a fourth document can take a name away from the second. Add anything that
+happens to mention wide-format and the TP-60 stops being findable that way —
+correctly, because the word has stopped identifying it. An index that appended
+the new document and left the others alone would keep a name that had quietly
+stopped being unique, and answer "and the wide one?" with the wrong manual,
+confidently.
+
+Rebuilding costs a fraction of a second on a corpus this size. A real one needs
+the incremental version of that argument, not a way around it — which is named
+in [`src/index/corpus.js`](src/index/corpus.js) rather than left to be
+discovered.
+
+Seven of the checks in `npm run check:screen` are this path: a document that did
+not exist when the service started is dropped in, asked about, found by a name
+derived from its own words — and the three invented manuals still answer as they
+did, which is the half that breaks if the rebuild is wrong.
+
 ## The measurement
 
 ```bash
@@ -199,7 +245,7 @@ demonstration, not a benchmark result.
 ```bash
 npm test              # 60  the cutting, the classifying, the naming, the vectors
 npm run measure       #      the claim, against twelve questions with known answers
-npm run check:screen  #  20  the console, driven with a browser
+npm run check:screen  #  27  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen
 npm run check:serving #  22  nobody can be handed yesterday's page
 ```

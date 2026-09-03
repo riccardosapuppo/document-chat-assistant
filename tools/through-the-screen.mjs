@@ -155,6 +155,89 @@ async function run() {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
     is('it does not scroll sideways at 760 wide', overflow <= 0, true);
+
+    // ------------------------------------------ 6. bringing your own document
+    //
+    // The part a visitor with a real document actually wants, and the part
+    // nothing else here can check: the index rebuilt from a file that did not
+    // exist when the service started.
+    await page.setViewportSize({ width: 1400, height: 1100 });
+    say('adding a document of your own');
+
+    await page.evaluate(() => {
+      document.getElementById('corpus').open = true;
+    });
+    await page.waitForTimeout(200);
+
+    is('it says how many documents it is reading', Number(await page.textContent('#about-documents')), 3);
+
+    // A manual for something that is not a printer, so nothing in it can be
+    // confused with the three invented ones -- and with a word in it that
+    // appears nowhere else, which is what a name is made of.
+    const mine = [
+      '# Coldstream K9 kettle',
+      '',
+      '## Filling it',
+      'The maximum is 1.7 litres, marked inside the body.',
+      '',
+      '## Descaling',
+      'Use citric acid every two months in hard water.',
+    ].join('\n');
+
+    await page.setInputFiles('#file', {
+      name: 'kettle-manual.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from(mine, 'utf8'),
+    });
+
+    await page.waitForFunction(
+      () => Number(document.getElementById('about-documents').textContent) === 4,
+      { timeout: 10000 }
+    );
+
+    is(
+      'a document dropped in is indexed, and the count says so',
+      Number(await page.textContent('#about-documents')),
+      4
+    );
+
+    is(
+      'and it is listed as yours rather than as one of the invented ones',
+      await page.locator('.documents li[data-given=\"false\"] .what').textContent(),
+      'kettle-manual'
+    );
+
+    await ask(page, 'how much water does the kettle hold');
+
+    has(
+      'a question about it is answered out of it',
+      await page.locator('#knowing-found li.first .where').textContent(),
+      'kettle-manual'
+    );
+
+    has(
+      'and the branch says which document it chose, and on which word',
+      await page.textContent('#knowing-how'),
+      'kettle'
+    );
+
+    // The three invented manuals still answer, which is the half that would
+    // break if adding a document appended to the index rather than rebuilding
+    // it -- or rebuilt it wrongly.
+    await ask(page, 'what does E-4412 mean');
+    has(
+      'and the invented manuals still answer as they did',
+      await page.locator('#knowing-found li.first .where').textContent(),
+      'halden-fault-codes'
+    );
+
+    await page.locator('[data-remove]').click();
+    await page.waitForFunction(
+      () => Number(document.getElementById('about-documents').textContent) === 3,
+      { timeout: 10000 }
+    );
+
+    is('removing it puts the index back', Number(await page.textContent('#about-documents')), 3);
   } finally {
     await browser.close();
   }

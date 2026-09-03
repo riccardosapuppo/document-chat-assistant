@@ -192,3 +192,170 @@ async function post(url, body) {
 
   return response.json();
 }
+
+// ─────────────────────────────────────────────── the documents in play
+
+/**
+ * Adding a document, and asking about it.
+ *
+ * The file is read here and sent as JSON — text as text, a PDF as base64 —
+ * rather than as a multipart upload. Multipart would mean a parser on the
+ * other end, which is a dependency or three hundred lines of boundary
+ * handling, to move bytes this page has already read.
+ */
+
+const READS = [".md", ".txt", ".pdf"];
+
+function saySoFar(documents) {
+  const mine = documents.filter((one) => !one.given).length;
+
+  $("corpus-say").textContent = mine
+    ? `${documents.length} documents, ${mine} of them yours`
+    : `${documents.length} invented manuals`;
+
+  $("documents").innerHTML = documents
+    .map((one) => {
+      const names = (one.called ?? []).slice(0, 4).join(", ");
+
+      return `<li data-given="${one.given}">
+        <span class="what">${escaped(one.name)}</span>
+        <span class="how-many">${one.pieces} pieces</span>
+        <span class="called">${names ? `found by: ${escaped(names)}` : "no name of its own"}</span>
+        ${one.given ? "<span class=\"given\">invented</span>" : `<button type="button" class="quiet" data-remove="${escaped(one.name)}">remove</button>`}
+      </li>`;
+    })
+    .join("");
+
+  for (const button of document.querySelectorAll("[data-remove]")) {
+    button.addEventListener("click", () => void remove(button.dataset.remove));
+  }
+}
+
+/**
+ * Escaped, because a document name comes from a file name and a file name is
+ * whatever somebody called their file. This page is served from a machine
+ * whose owner may not be the person dropping the file on it.
+ */
+function escaped(text) {
+  const box = document.createElement("span");
+  box.textContent = String(text ?? "");
+  return box.innerHTML;
+}
+
+function tell(words, trouble = false) {
+  const el = $("added");
+  el.hidden = false;
+  el.textContent = words;
+  el.dataset.trouble = trouble ? "yes" : "no";
+}
+
+async function showDocuments() {
+  try {
+    const said = await (await fetch("/api/documents")).json();
+    saySoFar(said.documents ?? []);
+  } catch {
+    $("corpus-say").textContent = "the service is not answering";
+  }
+}
+
+async function add(file) {
+  const suffix = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+
+  if (!READS.includes(suffix)) {
+    tell(`${file.name}: this reads ${READS.join(", ")}, and nothing else`, true);
+    return;
+  }
+
+  tell(`reading ${file.name}…`);
+
+  const body = { name: file.name };
+
+  if (suffix === ".pdf") {
+    // In chunks: String.fromCharCode(...bytes) on a whole file overflows the
+    // argument list somewhere around a hundred thousand bytes, and the error
+    // is "Maximum call stack size exceeded", which says nothing about PDFs.
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let at = 0; at < bytes.length; at += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(at, at + 8192));
+    }
+    body.base64 = btoa(binary);
+  } else {
+    body.text = await file.text();
+  }
+
+  const response = await fetch("/api/documents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const said = await response.json();
+
+  if (!response.ok) return tell(said.why ?? "that document could not be added", true);
+
+  tell(
+    `${said.name}: ${said.characters.toLocaleString("en-GB")} characters, ` +
+      `${said.pieces} pieces in the index. Ask it something.`
+  );
+
+  await showDocuments();
+  await sayWhatIsIndexed();
+}
+
+async function remove(name) {
+  const response = await fetch(`/api/documents/${encodeURIComponent(name)}`, { method: "DELETE" });
+  const said = await response.json();
+
+  if (!response.ok) return tell(said.why ?? "that could not be removed", true);
+
+  tell(`${name} is gone, and the index has been rebuilt without it.`);
+  await showDocuments();
+  await sayWhatIsIndexed();
+}
+
+/** The counts in the header, after the corpus has changed. */
+async function sayWhatIsIndexed() {
+  try {
+    const health = await (await fetch("/api/health")).json();
+    $("about-documents").textContent = health.documents.length;
+    $("about-pieces").textContent = health.pieces;
+  } catch {
+    /* the header keeping an old number is not worth an error on screen */
+  }
+}
+
+$("file").addEventListener("change", async (event) => {
+  for (const file of event.target.files) await add(file);
+  event.target.value = "";
+});
+
+// `dragover` has to be cancelled, or the browser navigates away from the page
+// and opens the file — losing everything on screen, in a way that looks like a
+// crash.
+for (const kind of ["dragenter", "dragover"]) {
+  $("drop").addEventListener(kind, (event) => {
+    event.preventDefault();
+    $("drop").dataset.over = "yes";
+  });
+}
+
+for (const kind of ["dragleave", "drop"]) {
+  $("drop").addEventListener(kind, () => {
+    $("drop").dataset.over = "no";
+  });
+}
+
+$("drop").addEventListener("drop", async (event) => {
+  event.preventDefault();
+  for (const file of event.dataTransfer?.files ?? []) await add(file);
+});
+
+$("reset").addEventListener("click", async () => {
+  await fetch("/api/documents/reset", { method: "POST" });
+  tell("Back to the three invented manuals.");
+  await showDocuments();
+  await sayWhatIsIndexed();
+});
+
+void showDocuments();

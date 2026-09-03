@@ -251,3 +251,125 @@ footer .by { margin-top: 0.5rem; }
   .two { grid-template-columns: minmax(0, 1fr); }
   .answer .what { min-height: 0; }
 }
+
+/* ===========================================================================
+ * The documents in play, and adding your own.
+ *
+ * A fold rather than a panel: the three invented manuals already answer the
+ * questions above, so nobody needs this to try the thing. Whoever wants their
+ * own document goes looking, and finds it where a second thought goes.
+ * ======================================================================== */
+
+details.corpus { padding: 0; }
+
+details.corpus > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  align-items: baseline;
+  padding: 1.1rem 1.3rem;
+  cursor: pointer;
+  list-style: none;
+}
+details.corpus > summary::-webkit-details-marker { display: none; }
+
+/* Drawn rather than borrowed, so it turns the same way in every browser and
+ * does not inherit a platform glyph nobody chose. */
+details.corpus > summary::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-left-color: var(--ink-faint);
+  transform: translateY(-0.05em);
+  transition: transform 0.12s;
+}
+details.corpus[open] > summary::before { transform: rotate(90deg) translateX(-0.05em); }
+
+details.corpus > summary h2 { margin: 0; }
+details.corpus > summary:hover h2 { color: var(--chosen); }
+details.corpus > summary:focus-visible { outline: 3px solid var(--chosen); outline-offset: -3px; }
+
+details.corpus > *:not(summary) { margin-left: 1.3rem; margin-right: 1.3rem; }
+details.corpus > *:last-child { margin-bottom: 1.3rem; }
+
+.summary-say {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+}
+
+/* ---------------------------------------------------------- what is in it */
+
+.documents { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+
+.documents li {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.75rem;
+  border-radius: 5px;
+  border-left: 3px solid var(--line);
+  background: var(--card);
+  font-size: 0.85rem;
+}
+
+.documents li[data-given='false'] { border-left-color: var(--chosen); background: var(--chosen-soft); }
+
+.documents .what { font-family: var(--mono); font-size: 0.82rem; color: var(--ink); min-width: 12rem; }
+.documents .how-many { color: var(--ink-faint); font-size: 0.78rem; }
+.documents .called { color: var(--ink-soft); font-size: 0.78rem; flex: 1; min-width: 12rem; }
+.documents .given { color: var(--ink-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.documents button { margin-left: auto; }
+
+/* ------------------------------------------------------------- adding one */
+
+.drop {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 1.1rem 1.2rem;
+  border: 2px dashed var(--line);
+  border-radius: 6px;
+  background: var(--raised, #faf7f0);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.drop input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drop:hover,
+.drop[data-over='yes'] { border-color: var(--chosen); background: var(--chosen-soft); }
+.drop:focus-within { outline: 3px solid var(--chosen); outline-offset: 2px; }
+
+.drop-say { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.drop-say strong { font-size: 1rem; color: var(--ink); }
+.drop-say span { font-size: 0.84rem; color: var(--ink-faint); }
+
+.added {
+  margin: 0.8rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  background: var(--chosen-soft);
+  color: #2f2596;
+  font-size: 0.85rem;
+}
+
+/* Amber, and it means one thing: this document was not taken, and here is why.
+ * Never used for anything else on this page. */
+.added[data-trouble='yes'] { background: #fdf3e0; color: #8a5a00; }
+
+@media (max-width: 42rem) {
+  .documents li { flex-direction: column; gap: 0.2rem; }
+  .documents button { margin-left: 0; }
+  .summary-say { margin-left: 0; width: 100%; }
+}
