@@ -1,0 +1,16 @@
+{
+  "name": "document-chat-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Answers questions about a set of documents, and knows when a vector search is the wrong tool for the question it was asked.",
+  "author": "Riccardo Sapuppo",
+  "license": "MIT",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
