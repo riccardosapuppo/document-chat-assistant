@@ -54,9 +54,25 @@ export function normalise(text) {
     .trim();
 }
 
-/** The words of a string, normalised, with the empty ones dropped. */
+/**
+ * The words of a string, normalised, with the punctuation off the ends.
+ *
+ * Splitting on spaces alone leaves "range." and "range" as two different words,
+ * and everything that compares words then quietly fails on whichever one
+ * happened to end a sentence. It was worse than quiet here: a document's list
+ * of names for itself picked up "tp-40," — with the comma — from a sentence in
+ * the TP-60 manual mentioning the other machine, and a name for one document
+ * that is really the name of another is the worst thing in that list.
+ *
+ * Punctuation is stripped from the ends only. Inside a word it is meaningful:
+ * `tp-60` is a part number and `wide-format` is one idea, and splitting either
+ * of them leaves two-letter fragments that match everything.
+ */
 export function words(text) {
-  return normalise(text).split(' ').filter(Boolean);
+  return normalise(text)
+    .split(' ')
+    .map((one) => one.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter(Boolean);
 }
 
 /**
@@ -83,7 +99,46 @@ export const EMPTY_WORDS = new Set([
   'per', 'più', 'piu', 'quale', 'quali', 'si', 'su', 'sul', 'un', 'una', 'uno',
 ]);
 
-/** The words worth searching on: normalised, long enough, and not empty ones. */
+/**
+ * A word with its commonest ending taken off.
+ *
+ * Deliberately crude, and worth being honest about why it exists at all: a
+ * **lexical** index matches words, so "cleaned" and "Cleaning" are two
+ * different things to it and a question about one does not find a section about
+ * the other. That is not a failing of this project's idea, it is the standing
+ * weakness of the tool — and a real embedding does not have it, which is
+ * precisely the sort of difference `npm run measure` is there to show.
+ *
+ * A full stemmer is a large table of exceptions and a source of surprises
+ * ("business" → "busi"). This takes off the four endings that account for most
+ * of the mismatches and refuses to leave a stem shorter than four letters,
+ * because a three-letter stem matches half the language.
+ *
+ * It is applied to the documents and to the questions by the same function, so
+ * the two can never be stemmed differently — which is the failure mode that
+ * makes a search quietly return nothing for a word that is plainly there.
+ */
+export function stem(word) {
+  const said = String(word ?? '');
+
+  for (const ending of ['ings', 'ing', 'edly', 'ed', 'est', 'es', 's']) {
+    if (!said.endsWith(ending)) continue;
+
+    const shorter = said.slice(0, -ending.length);
+    if (shorter.length >= 4) return shorter;
+  }
+
+  return said;
+}
+
+/**
+ * The words worth searching on: normalised, long enough, not empty, stemmed.
+ *
+ * The empty-word check happens **before** stemming, so the list can stay a list
+ * of words people write rather than a list of stems nobody would recognise.
+ */
 export function meaningfulWords(text, { atLeast = 3 } = {}) {
-  return words(text).filter((one) => one.length >= atLeast && !EMPTY_WORDS.has(one));
+  return words(text)
+    .filter((one) => one.length >= atLeast && !EMPTY_WORDS.has(one))
+    .map((one) => stem(one));
 }
