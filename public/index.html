@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask the manuals — and see which search answered</title>
+    <link rel="icon" href="mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="console.css" />
+  </head>
+
+  <body>
+    <header class="top">
+      <div class="wordmark">
+        <img src="mark.svg" alt="" width="30" height="30" />
+        <div>
+          <h1>Ask the manuals</h1>
+          <p>
+            Every question is answered twice — the ordinary way, and by looking
+            at the question first. Both are shown, so the difference is
+            something you can see rather than something to take on trust.
+          </p>
+        </div>
+      </div>
+
+      <dl class="about" id="about">
+        <div><dt>documents</dt><dd id="about-documents">—</dd></div>
+        <div><dt>pieces</dt><dd id="about-pieces">—</dd></div>
+        <div><dt>embeddings</dt><dd id="about-embeddings" class="mono">—</dd></div>
+      </dl>
+    </header>
+
+    <main>
+      <section class="panel asking">
+        <form id="ask-form">
+          <label class="visually-hidden" for="question">Your question</label>
+          <input
+            type="text"
+            id="question"
+            placeholder="what does E-4412 mean"
+            autocomplete="off"
+            required
+          />
+          <button type="submit">Ask</button>
+        </form>
+
+        <p class="hint">
+          Nothing is generated. What comes back is the passage itself, with the
+          document and heading it came from — a sentence written <em>about</em>
+          the passage would be the part everybody reads and nobody can check.
+        </p>
+
+        <div class="conversation" id="conversation" hidden>
+          <span>asked before this:</span>
+          <ol id="conversation-list"></ol>
+          <button type="button" id="forget" class="quiet">start again</button>
+        </div>
+
+        <ul class="try" id="try">
+          <li><button type="button" data-try="how heavy can the label stock be on the TP-40">a plain one</button></li>
+          <li><button type="button" data-try="what does E-4412 mean">a code</button></li>
+          <li><button type="button" data-try="what does NETWORK_MODE do">a setting</button></li>
+          <li>
+            <button type="button" data-try="and the TP-60?" data-after="what is the smallest margin the TP-40 will print">
+              one that leans on the last
+            </button>
+          </li>
+          <li><button type="button" data-try="my labels come out faded on one side only">one said differently</button></li>
+        </ul>
+      </section>
+
+      <!-- What the question was taken to be. ------------------------------- -->
+      <section class="panel reading" id="reading" hidden>
+        <h2>What it made of the question</h2>
+        <ul id="reading-list"></ul>
+      </section>
+
+      <!-- The two answers, side by side. ----------------------------------- -->
+      <div class="two" id="two" hidden>
+        <section class="panel answer plain">
+          <h2>Similarity alone</h2>
+          <p class="what">What almost every “chat with your documents” does: compare the question with every piece, return the nearest.</p>
+          <ol class="found" id="plain-found"></ol>
+        </section>
+
+        <section class="panel answer knowing">
+          <h2>Knowing what kind of question it is</h2>
+          <p class="what" id="knowing-how">—</p>
+          <ol class="found" id="knowing-found"></ol>
+        </section>
+      </div>
+
+      <p class="verdict" id="verdict" hidden></p>
+    </main>
+
+    <footer>
+      <p>
+        Everything is on this machine. No account, no key, no model, no network
+        — <code id="footer-embeddings">the local index</code> is built from the
+        documents in <code>samples/</code> when the service starts.
+      </p>
+      <p class="by">Ask the manuals 1.0.0 — developed by Riccardo Sapuppo</p>
+    </footer>
+
+    <script type="module" src="console.js"></script>
+  </body>
+</html>

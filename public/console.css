@@ -1,0 +1,253 @@
+/*
+ * One screen, and it is a comparison.
+ *
+ * The two answers sit side by side at the same width and in the same type,
+ * because the argument only works if they are shown fairly: a layout that gave
+ * the preferred answer more room, a heavier weight or a warmer colour would be
+ * making the case typographically instead of letting the reader make it. The
+ * only difference between the two columns is a rule down the left of one.
+ */
+
+/*
+ * Fraunces, variable, under the SIL Open Font License — the licence travels
+ * with it in `fonts/OFL-Fraunces.txt`.
+ *
+ * Carried in the repository rather than fetched. A font from somebody else's
+ * server is a request to somebody else's server made by a tool whose whole
+ * claim is that nothing leaves this machine, and a local tool that needs a
+ * network is not a local tool.
+ *
+ * A serif, and deliberately: this is about manuals, and the page should read
+ * like something printed rather than like another dashboard.
+ */
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('fonts/fraunces-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --ink: #1b1a17;
+  --ink-soft: #56534c;
+  --ink-faint: #8a857c;
+  --paper: #f6f3ec;
+  --card: #fffdf8;
+  --line: #e0dace;
+
+  /* The one accent, and it means one thing: the branch that fired. */
+  --chosen: #4b3bd6;
+  --chosen-soft: #eceafb;
+
+  --display: Fraunces, Georgia, 'Times New Roman', serif;
+  --sans: system-ui, 'Segoe UI', -apple-system, sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+/*
+ * `hidden` means hidden, whatever else the element is told to be.
+ *
+ * The attribute works by a `display: none` in the browser's own stylesheet, and
+ * any rule of ours that sets `display` beats it — so `.two { display: grid }`
+ * left the results panel on screen before a single question had been asked,
+ * showing two empty columns and a verdict about nothing. It is the sort of
+ * thing that looks like a state-management bug for an hour.
+ */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  padding: 0 0 3rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.6 var(--sans);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ------------------------------------------------------------------- top */
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem 2rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 1.8rem clamp(1rem, 4vw, 3rem) 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark { display: flex; gap: 0.9rem; align-items: flex-start; }
+.wordmark img { margin-top: 0.2rem; }
+
+.top h1 {
+  margin: 0;
+  font: 600 1.6rem/1.1 var(--display);
+  font-variation-settings: 'SOFT' 30, 'WONK' 1, 'opsz' 20;
+  letter-spacing: -0.01em;
+}
+.top p { margin: 0.4rem 0 0; color: var(--ink-soft); max-width: 56ch; font-size: 0.9rem; }
+
+.about { display: flex; gap: 1.4rem; margin: 0; }
+.about dt {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+}
+.about dd { margin: 0.15rem 0 0; font: 600 1.15rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.about .mono { font: 500 0.85rem/1.6 var(--mono); }
+
+/* ---------------------------------------------------------------- panels */
+
+main { padding: 1.5rem clamp(1rem, 4vw, 3rem) 0; }
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1.2rem 1.3rem 1.3rem;
+  margin-bottom: 1.1rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.3rem;
+  font: 600 1.05rem/1.2 var(--display);
+  font-variation-settings: 'SOFT' 30, 'opsz' 14;
+}
+
+/* --------------------------------------------------------------- asking */
+
+#ask-form { display: flex; gap: 0.6rem; }
+
+#question {
+  flex: 1;
+  min-width: 0;
+  font: 1.05rem/1.4 var(--display);
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--ink);
+}
+#question:focus-visible { outline: 3px solid var(--chosen); outline-offset: 1px; }
+
+button {
+  font: 600 0.9rem/1 var(--sans);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+}
+button:hover { background: #34322c; }
+button:focus-visible { outline: 3px solid var(--chosen); outline-offset: 2px; }
+
+button.quiet { background: none; color: var(--ink-soft); border-color: var(--line); padding: 0.35rem 0.6rem; font-size: 0.78rem; }
+button.quiet:hover { background: #f1ede3; color: var(--ink); }
+
+.hint { margin: 0.7rem 0 0; color: var(--ink-faint); font-size: 0.84rem; max-width: 72ch; }
+
+.try { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.9rem 0 0; padding: 0; }
+.try button {
+  background: #f1ede3;
+  color: var(--ink-soft);
+  border-color: var(--line);
+  font-weight: 500;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+}
+.try button:hover { background: #e8e2d4; color: var(--ink); }
+
+.conversation {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+}
+.conversation ol { display: flex; gap: 0.5rem; margin: 0; padding: 0; list-style: none; flex-wrap: wrap; }
+.conversation li { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-soft); }
+.conversation li::before { content: '“'; }
+.conversation li::after { content: '”'; }
+
+/* --------------------------------------------- what it made of the question */
+
+.reading ul { margin: 0.6rem 0 0; padding-left: 1.1rem; }
+.reading li { margin-bottom: 0.3rem; color: var(--ink-soft); font-size: 0.88rem; }
+.reading strong { color: var(--ink); font-weight: 620; }
+
+/* ------------------------------------------------------------ the two */
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+
+/*
+ * The same width, the same type, the same everything. The preferred answer is
+ * marked by a rule and by nothing else: a column made warmer or heavier would
+ * be making the argument typographically instead of showing it.
+ */
+.answer.knowing { border-left: 3px solid var(--chosen); }
+
+.answer .what { margin: 0 0 0.8rem; color: var(--ink-faint); font-size: 0.82rem; min-height: 2.6em; }
+.answer.knowing .what { color: var(--chosen); }
+
+.found { list-style: none; margin: 0; padding: 0; }
+.found li { padding: 0.7rem 0; border-top: 1px solid var(--line); }
+.found li.first { border-top: none; padding-top: 0; }
+.found li:not(.first) { opacity: 0.62; }
+
+.where { margin: 0; font: 600 0.82rem/1.4 var(--mono); }
+.answer.knowing .found li.first .where { color: var(--chosen); }
+.why { margin: 0.1rem 0 0.4rem; font-size: 0.76rem; color: var(--ink-faint); }
+
+blockquote {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  background: #faf7f0;
+  border-radius: 3px;
+  font: 0.86rem/1.55 var(--display);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 11rem;
+  overflow: auto;
+}
+
+.none { color: var(--ink-faint); font-style: italic; }
+
+/* ------------------------------------------------------------- the verdict */
+
+.verdict {
+  margin: 0.2rem 0 0;
+  padding: 0.8rem 1rem;
+  border-radius: 3px;
+  font-size: 0.88rem;
+}
+.verdict.different { background: var(--chosen-soft); color: #2f2596; }
+.verdict.same { background: #f1ede3; color: var(--ink-soft); }
+
+/* ------------------------------------------------------------------ foot */
+
+footer { padding: 1.6rem clamp(1rem, 4vw, 3rem) 0; }
+footer p { margin: 0; color: var(--ink-faint); font-size: 0.82rem; max-width: 74ch; }
+footer code { font-family: var(--mono); font-size: 0.78rem; }
+footer .by { margin-top: 0.5rem; }
+
+@media (max-width: 62rem) {
+  .two { grid-template-columns: minmax(0, 1fr); }
+  .answer .what { min-height: 0; }
+}

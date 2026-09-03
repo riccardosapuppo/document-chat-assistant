@@ -1,0 +1,97 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Every job here has a timeout. One that hangs is worse than one that fails:
+  # it stays amber for six hours and nobody looks at it, while a red one sends
+  # an email.
+  parts-and-claim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The version this is known to run on, and the one `engines` declares.
+          node-version: '24'
+
+      - run: npm ci
+
+      - name: the parts
+        run: npm test
+
+      - name: the claim
+        # Not a vanity number: it fails the run if a question plain similarity
+        # got right is traded away for the awkward ones. Everything else in its
+        # output is a report to read, because that number is expected to move as
+        # the corpus and the questions grow.
+        run: npm run measure
+
+      - name: nobody can be handed yesterday's page
+        run: npm run check:serving
+
+      - name: it answers, over HTTP, from a standing start
+        # The README opens with `npm start`. This is that command, and a request
+        # to the thing it starts — the check that catches a project which builds
+        # and tests and does not run.
+        run: |
+          PORT=3799 node src/index.js &
+          service=$!
+          trap 'kill $service 2>/dev/null || true' EXIT
+
+          for try in $(seq 1 100); do
+            if curl -sf "http://127.0.0.1:3799/api/health" > /dev/null; then break; fi
+            sleep 0.2
+          done
+
+          curl -sf "http://127.0.0.1:3799/api/health" | grep -q '"ok":true' \
+            || { echo "it did not answer about itself"; exit 1; }
+
+          answer=$(curl -sf -X POST "http://127.0.0.1:3799/api/ask" \
+            -H 'Content-Type: application/json' \
+            -d '{"question":"what does E-4412 mean"}')
+
+          echo "$answer" | grep -q '"heading":"E-4412"' \
+            || { echo "asked about a code and did not find the section headed by it:"; echo "$answer"; exit 1; }
+
+          echo "it started, and answered a question about a code correctly"
+
+      - name: nothing here reaches the network at runtime
+        # The claim the whole design rests on. The OpenAI provider is the one
+        # allowed exception and lives in a single named file; anything else that
+        # fetches at runtime would make "no account, no key, no network" untrue.
+        run: |
+          # Call sites, not strings. The first version of this looked for URLs
+          # and flagged the line where the service logs its own address —
+          # `http://${HOST}:${PORT}`, which reaches nothing and is the address
+          # it is listening ON. A string is not a request; a call is. A check
+          # that cries wolf about a log line is a check somebody deletes.
+          reaching='\bfetch\(|from .node:https?.|require\(.node:https?.\)'
+
+          found=$(grep -rlnP "$reaching" src/ --include='*.js' | grep -v 'src/index/embed.js' || true)
+
+          if [ -n "$found" ]; then
+            echo "these reach outside, and only src/index/embed.js may:"
+            grep -rnP "$reaching" $found || true
+            exit 1
+          fi
+
+          echo "only the embeddings module can reach the network, and only when asked to"
+
+# `npm run check:screen`, `check:mark` and `screenshots` are not here, and that
+# is deliberate. All three drive the browser already installed on the machine
+# (`channel: 'msedge'`) rather than downloading one, which is the right trade on
+# a workstation and impossible on a runner that has no browser. Making them pass
+# in CI would mean pulling several hundred megabytes of Chromium on every push.
+# They are run before every commit instead, and they say plainly when they
+# cannot run.

@@ -8,10 +8,22 @@
   "license": "MIT",
   "main": "src/index.js",
   "scripts": {
+    "start": "node src/index.js",
     "test": "node --test",
-    "measure": "node tools/measure.mjs"
+    "measure": "node tools/measure.mjs",
+    "check:serving": "node tools/how-it-is-served.mjs",
+    "check:screen": "node tools/through-the-screen.mjs",
+    "check:mark": "node tools/check-mark.mjs",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "playwright-core": "^1.62.1"
   }
 }
