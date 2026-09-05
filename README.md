@@ -35,10 +35,11 @@ takes less time than the port takes to bind.
 | `npm run measure` with real embeddings | `OPENAI_API_KEY`, and it is optional |
 | `npm run check:screen`, `check:mark`, `screenshots` | **Microsoft Edge** — they drive the browser already on this machine rather than downloading one |
 
-**Measured, not estimated:** `npm install` fetches 68 packages and writes
-**5.6 MB** into `node_modules` — one dependency does not bring much with it.
-Nothing reaches the network at runtime, ever: that is what the local index is
-for.
+**Measured, not estimated:** `npm install` fetches **70 packages** and writes
+**17.7 MB** into `node_modules`. Only **2.3 MB** of that is the service — one
+dependency does not bring much with it — and the rest is the browser driver
+those last three need, which `npm install --omit=dev` does not fetch. Nothing
+reaches the network at runtime, ever: that is what the local index is for.
 
 **To put the machine back:** delete `node_modules/` and the clone. Nothing is
 installed globally, nothing is registered, no port is left listening.
@@ -243,7 +244,7 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 60  the cutting, the classifying, the naming, the vectors
+npm test              # 63  the cutting, the classifying, the naming, the vectors
 npm run measure       #      the claim, against twelve questions with known answers
 npm run check:screen  #  27  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen

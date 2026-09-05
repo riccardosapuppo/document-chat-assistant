@@ -142,3 +142,82 @@ describe('what the README promises about the runtime', () => {
     }
   });
 });
+
+describe('what the README says the install costs', () => {
+  // Three figures, and all three are derivable from this repository rather than
+  // remembered. The count is the lockfile's entries minus the root, which is
+  // what `npm install` prints as "added N packages" and can be read without
+  // installing anything. The bytes are those resolved packages walked on disk —
+  // the packages only, not the whole of `node_modules`, because `.bin` is one
+  // symlink per command on one platform and three shim files on another, and a
+  // figure that moved with the operating system would be nobody's.
+  //
+  // This sentence rotted the ordinary way: it said 68 packages and 5.6 MB, both
+  // true the day they were typed, and then a browser driver and a font arrived
+  // as dev dependencies and nothing ever looked at the sentence again. 68 is
+  // still the right answer to a question the README had stopped asking.
+  const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  const resolved = Object.entries(lock.packages).filter(([where]) => where !== '');
+
+  // Weighable only when everything the lockfile resolves is really there: a
+  // half-installed tree weighs less and would call the README wrong for it.
+  const installed = resolved.every(([where]) => fs.existsSync(path.join(root, where)));
+  const nothingToWeigh = 'the packages the lockfile resolves are not all on disk here';
+
+  const megabytes = (only) =>
+    Number(
+      (
+        resolved
+          .filter(([, what]) => only(what))
+          .reduce((all, [where]) => all + bytesUnder(path.join(root, where)), 0) / 1e6
+      ).toFixed(1)
+    );
+
+  it('is the number of packages the lockfile resolves', () => {
+    const said = readme.match(/`npm install` fetches \*\*(\d+) packages\*\*/);
+
+    assert.ok(said, 'the README no longer says how many packages `npm install` fetches');
+    assert.equal(Number(said[1]), resolved.length, `the README says ${said[1]}; the lockfile resolves ${resolved.length}`);
+  });
+
+  it('and the megabytes they weigh once they are written', (t) => {
+    if (!installed) return t.skip(nothingToWeigh);
+
+    const said = readme.match(/writes\s+\*\*([\d.]+) MB\*\* into `node_modules`/);
+    const weighed = megabytes(() => true);
+
+    assert.ok(said, 'the README no longer says how much `npm install` writes');
+    assert.equal(Number(said[1]), weighed, `the README says ${said[1]} MB; they weigh ${weighed.toFixed(1)} MB`);
+  });
+
+  it('and the share of that the service alone needs', (t) => {
+    if (!installed) return t.skip(nothingToWeigh);
+
+    // The half of the sentence worth reading: what somebody who only runs the
+    // service pays, against what the browser checks add on top. Split on the
+    // lockfile's own `dev` flag, which is the flag `--omit=dev` goes by, so the
+    // README and the command it names cannot disagree about where the line is.
+    const said = readme.match(/Only \*\*([\d.]+) MB\*\* of that is the service/);
+    const weighed = megabytes((what) => !what.dev);
+
+    assert.ok(said, 'the README no longer says what the service alone costs');
+    assert.equal(Number(said[1]), weighed, `the README says ${said[1]} MB; they weigh ${weighed.toFixed(1)} MB`);
+  });
+});
+
+/**
+ * Every byte under a directory, counted as file contents rather than as blocks
+ * on disk — so the answer is the same on a filesystem that allocates otherwise.
+ */
+function bytesUnder(dir) {
+  let bytes = 0;
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const at = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) bytes += bytesUnder(at);
+    else if (entry.isFile()) bytes += fs.statSync(at).size;
+  }
+
+  return bytes;
+}
