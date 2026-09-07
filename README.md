@@ -281,6 +281,19 @@ document rather than wholesale, and vectors that do not all have to fit in
 memory at once — none of which changes a line of the retrieval above, which is
 the point of it being in files of its own.
 
+## Production reconstruction
+
+This repository is an independent reconstruction of a production system I
+designed and developed.
+
+Confidentiality and intellectual property constraints mean the original cannot
+be published. It was rebuilt from scratch so it could be shown and run,
+preserving the core architecture, workflows and technical challenges of the
+production solution, with newly written code and fictional data.
+
+No proprietary source code, confidential data or client assets from the
+original system are included in this repository.
+
 ---
 
 ![The mark, at 16, 32 and 64 pixels](docs/the-mark.png)
