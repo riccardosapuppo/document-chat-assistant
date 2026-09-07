@@ -4,7 +4,7 @@ A question-answering service over a set of documents, whose argument is a
 narrow one:
 
 > **A vector search is the wrong tool for a large share of what people actually
-> ask a manual — and it fails at those questions confidently, with a citation.**
+> ask a manual, and it fails at those questions confidently, with a citation.**
 
 So before anything is retrieved, the question is looked at. What kind of
 question is it? Does it stand on its own, or is it leaning on the one before?
@@ -14,7 +14,7 @@ because plain similarity gets that class wrong, and **`npm run measure` reports
 by how much**.
 
 The original was built for a client and lives in a private repository. This is
-an independent reimplementation, written from scratch with invented documents —
+an independent reimplementation, written from scratch with invented documents,
 but the retrieval it argues for is traced from that code, which had learned all
 of this the expensive way, in production, one class of complaint at a time.
 
@@ -36,10 +36,10 @@ takes less time than the port takes to bind.
 | `npm run check:screen`, `check:mark`, `screenshots` | **Microsoft Edge** — they drive the browser already on this machine rather than downloading one |
 
 **Measured, not estimated:** `npm install` fetches **70 packages** and writes
-**17.7 MB** into `node_modules`. Only **2.3 MB** of that is the service — one
-dependency does not bring much with it — and the rest is the browser driver
-those last three need, which `npm install --omit=dev` does not fetch. Nothing
-reaches the network at runtime, ever: that is what the local index is for.
+**17.7 MB** into `node_modules`. Only **2.3 MB** of that is the service, since
+one dependency brings little with it, and the rest is the browser driver those
+last three need, which `npm install --omit=dev` does not fetch. Nothing reaches
+the network at runtime, ever: that is what the local index is for.
 
 **To put the machine back:** delete `node_modules/` and the clone. Nothing is
 installed globally, nothing is registered, no port is left listening.
@@ -51,8 +51,8 @@ npm install
 npm start        # the console on http://127.0.0.1:3700
 ```
 
-Then ask it something. Every question is answered **twice** — the ordinary way
-and by looking at the question first — and both are shown, so the difference is
+Then ask it something. Every question is answered **twice** (the ordinary way
+and by looking at the question first), and both are shown, so the difference is
 something you can see rather than a claim to take on trust.
 
 ---
@@ -62,7 +62,7 @@ something you can see rather than a claim to take on trust.
 The three invented manuals answer the questions above, so nothing has to be
 brought along to try this. But a retrieval system is only interesting on text
 somebody actually cares about, so the console takes **`.md`, `.txt` and `.pdf`**
-— dropped on it, or chosen — and indexes them beside the manuals.
+(dropped on it, or chosen) and indexes them beside the manuals.
 
 A PDF is read for the text it already carries. That reader
 ([`src/text/pdf.js`](src/text/pdf.js)) is copied from a sibling project, where
@@ -78,8 +78,8 @@ this is a demonstration anybody can open.
 
 ### Adding a document rebuilds the whole index
 
-Not the new document’s part of it. The whole thing, every time — and that is
-the interesting consequence of how documents are found.
+Not the new document’s part of it: the whole thing, every time, which is the
+interesting consequence of how documents are found.
 
 A document’s **names** are worked out against the whole corpus: an ordinary
 word only becomes a name if it appears *nowhere in any other document*. That is
@@ -87,21 +87,21 @@ what makes "and the wide one?" answerable, since the TP-60 opens by calling
 itself wide-format and nothing else in the folder uses the word.
 
 So a fourth document can take a name away from the second. Add anything that
-happens to mention wide-format and the TP-60 stops being findable that way —
+happens to mention wide-format and the TP-60 stops being findable that way,
 correctly, because the word has stopped identifying it. An index that appended
 the new document and left the others alone would keep a name that had quietly
 stopped being unique, and answer "and the wide one?" with the wrong manual,
 confidently.
 
 Rebuilding costs a fraction of a second on a corpus this size. A real one needs
-the incremental version of that argument, not a way around it — which is named
-in [`src/index/corpus.js`](src/index/corpus.js) rather than left to be
-discovered.
+the incremental version of that argument, not a way around it, and
+[`src/index/corpus.js`](src/index/corpus.js) names it rather than leaving it to
+be discovered.
 
 Seven of the checks in `npm run check:screen` are this path: a document that did
 not exist when the service started is dropped in, asked about, found by a name
-derived from its own words — and the three invented manuals still answer as they
-did, which is the half that breaks if the rebuild is wrong.
+derived from its own words, while the three invented manuals still answer as
+they did, which is the half that breaks if the rebuild is wrong.
 
 ## The measurement
 
@@ -110,9 +110,9 @@ npm run measure
 ```
 
 Twelve questions with a known right answer, grouped by kind, each judged on
-**the first result only** — because whatever is first is what gets read, quoted
-and acted on, and "it was in the top five" is how retrieval is usually reported
-and is not how it is used.
+**the first result only**, because whatever is first is what gets read, quoted
+and acted on, and "it was in the top five" is how retrieval is usually reported,
+not how it is used.
 
 ```
 question           similarity alone   knowing the kind
@@ -129,24 +129,24 @@ content of the claim.
 
 ### What each kind is
 
-**ordinary** — phrased in the document's own words. A similarity search is good
+**ordinary**: phrased in the document's own words. A similarity search is good
 at these, and a change that improved the others by breaking these would not be
 an improvement. The measurement fails the run if any question plain similarity
 got right is traded away.
 
-**literal** — `E-4412`, `NETWORK_MODE`. A code has no semantic neighbours: it is
+**literal**: `E-4412`, `NETWORK_MODE`. A code has no semantic neighbours: it is
 an arbitrary string, so its embedding is near other arbitrary strings, which is
 to say near nothing. Asked "what does E-4412 mean", plain similarity returns the
 passage most *about* fault codes in general. The right tool is a literal match,
 and the branch that fires says so on screen.
 
-**leaning** — "and the TP-60?", "is it the same part?". Not questions at all on
+**leaning**: "and the TP-60?", "is it the same part?". Not questions at all on
 their own. Embed one and you get the centre of every short vague sentence in the
 corpus, returned confidently and about the wrong thing.
 
 ![One that leans on the question before it](docs/one-that-leans.png)
 
-The subject of the previous question is carried forward — but **the question in
+The subject of the previous question is carried forward, but **the question in
 front of you decides which document**, not the one before it. That is not a
 detail: "and the TP-60?" carries the words of a TP-40 question forward, those
 words contain "TP-40", and for a while the carried subject out-voted the named
@@ -154,7 +154,7 @@ one and the answer came back about the machine the person had just stopped
 asking about. Which is the exact failure the carrying was added to prevent,
 arriving from the other side.
 
-**said differently** — the words in the question are not the words in the
+**said differently**: the words in the question are not the words in the
 document. **Both approaches score zero here, and that is the honest half of this
 page.** The default index is lexical — it matches words, not meanings — so
 "faded on one side" cannot reach "quality falls off at one edge". This is
@@ -178,8 +178,8 @@ Every decision is shown, in the words of the thing that made it: which branch
 fired, which document was chosen and on which word, and what the question was
 rewritten to when it did not stand on its own.
 
-That is not decoration. A retrieval system that answers without saying why is a
-system whose wrong answers cannot be traced to anything — the only available
+That is not decoration. A retrieval system that answers without saying why is
+one whose wrong answers cannot be traced to anything: the only available
 explanation is "the model", which is not an explanation and cannot be fixed. A
 wrong answer here points at the branch that produced it.
 
@@ -207,12 +207,12 @@ difference between them is a name, and **a name is matched, not measured**.
 So each document's names are worked out from its own first lines, and there are
 two kinds because they cannot follow the same rule:
 
-- **part numbers**, kept whatever else mentions them — `tp-40` is also `tp40`,
+- **part numbers**, kept whatever else mentions them: `tp-40` is also `tp40`,
   `tp 40` and `tp/40`, and the TP-60's manual talks about the TP-40 in its first
   paragraph, so a rule that dropped any name another document says would leave
   the TP-40 manual with no reliable name at all;
 - **ordinary words**, but only those appearing **nowhere in any other
-  document** — which is what makes "and the wide one?" answerable, since the
+  document**, which is what makes "and the wide one?" answerable, since the
   TP-60 opens by calling itself wide-format and nothing else in the folder uses
   the word.
 
@@ -231,7 +231,7 @@ what an embedding is for.
 
 **Comparative questions.** "Is it the same part?" after a question about the
 TP-40 is answered from the TP-40's manual, and the passage that answers it is in
-the TP-60's — the one that says *"It is not the same part as the TP-40 head"*. A
+the TP-60's, the one that says *"It is not the same part as the TP-40 head"*. A
 question comparing two things needs both documents, and this picks one. It is a
 known miss, in the report, on purpose.
 
