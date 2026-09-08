@@ -42,6 +42,18 @@ const $ = (id) => document.getElementById(id);
  */
 const asked = [];
 
+/**
+ * The answers to those questions, so going back to one is going back.
+ *
+ * The thread is a list of buttons, and a button that re-asked would be a lie:
+ * the same question later has a different history behind it and can come back
+ * different. Keeping what came back means pressing one shows what it showed.
+ */
+const answers = [];
+
+/** Which turn the right-hand side is showing. */
+let showing = -1;
+
 // ------------------------------------------------------------------ what it is
 
 (async function sayWhatThisIs() {
@@ -81,7 +93,17 @@ for (const button of document.querySelectorAll('[data-try]')) {
 
 $('forget').addEventListener('click', () => {
   asked.length = 0;
+  answers.length = 0;
+  showing = -1;
   drawTheConversation();
+
+  // Back to the sentence that was there before anything was asked, rather than
+  // to the last answer with nothing to say who asked for it.
+  $('nothing-yet').hidden = false;
+  $('asked-now').hidden = true;
+  $('reading').hidden = true;
+  $('two').hidden = true;
+  $('verdict').hidden = true;
 });
 
 async function ask(question, { quietly = false } = {}) {
@@ -91,9 +113,35 @@ async function ask(question, { quietly = false } = {}) {
   const answer = await post('/api/ask', { question: said, history: [...asked] });
 
   asked.push(said);
+  answers.push(answer);
+
+  if (quietly) {
+    drawTheConversation();
+    return;
+  }
+
+  show(asked.length - 1);
+}
+
+/**
+ * Put one turn on the right-hand side.
+ *
+ * Drawing is separated from asking because the thread can ask for a turn that
+ * was answered a while ago, and re-running the question to see an old answer
+ * would give a different one: by then the history behind it has changed.
+ */
+function show(at) {
+  const answer = answers[at];
+  if (!answer) return;
+
+  showing = at;
   drawTheConversation();
 
-  if (quietly) return;
+  $('nothing-yet').hidden = true;
+
+  const asking = $('asked-now');
+  asking.textContent = asked[at];
+  asking.hidden = false;
 
   drawWhatItMadeOfIt(answer);
   draw($('plain-found'), answer.plain);
@@ -178,8 +226,21 @@ function draw(into, found) {
 
 function drawTheConversation() {
   $('conversation').hidden = asked.length === 0;
+  $('forget').hidden = asked.length === 0;
+
   $('conversation-list').replaceChildren(
-    ...asked.map((one) => Object.assign(document.createElement('li'), { textContent: one }))
+    ...asked.map((one, at) => {
+      const li = document.createElement('li');
+      if (at === showing) li.setAttribute('aria-current', 'true');
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = one;
+      button.addEventListener('click', () => show(at));
+
+      li.append(button);
+      return li;
+    })
   );
 }
 

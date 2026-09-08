@@ -29,44 +29,111 @@
       </dl>
     </header>
 
+    <!--
+      Two regions, and which one is which matters.
+
+      This page used to run down the screen: ask, then a paragraph, then five
+      suggestions, then the documents, then what the question was taken to be,
+      and only then the two answers. The comparison is the whole reason this
+      project exists and it began below the fold, with the question that
+      produced it scrolled off the top — so the thing you were meant to compare
+      arrived without the thing it was an answer to.
+
+      The asking is a column of its own now, on the left, with the questions
+      already asked above the box and the box at the foot of it. The answer
+      takes the rest, and opens with the question restated, because an answer
+      whose question is elsewhere is a paragraph about nothing.
+
+      Not a dialog. A dialog would cover one of the two, and the two together
+      are the point.
+    -->
     <main>
-      <section class="panel asking">
-        <form id="ask-form">
-          <label class="visually-hidden" for="question">Your question</label>
-          <input
-            type="text"
-            id="question"
-            placeholder="what does E-4412 mean"
-            autocomplete="off"
-            required
-          />
-          <button type="submit">Ask</button>
-        </form>
+      <div class="desk">
+        <section class="rail" aria-label="What you asked">
+          <!--
+            The thread. Every question is a button: the answers are kept, so
+            going back to one is going back, not asking again.
+          -->
+          <div class="thread" id="conversation">
+            <ol id="conversation-list"></ol>
+          </div>
 
-        <p class="hint">
-          Nothing is generated. What comes back is the passage itself, with the
-          document and heading it came from; a sentence written <em>about</em>
-          it would be the part everybody reads and nobody can check.
-        </p>
+          <div class="composer">
+            <ul class="try" id="try">
+              <li><button type="button" data-try="how heavy can the label stock be on the TP-40">a plain one</button></li>
+              <li><button type="button" data-try="what does E-4412 mean">a code</button></li>
+              <li><button type="button" data-try="what does NETWORK_MODE do">a setting</button></li>
+              <li>
+                <button type="button" data-try="and the TP-60?" data-after="what is the smallest margin the TP-40 will print">
+                  one that leans on the last
+                </button>
+              </li>
+              <li><button type="button" data-try="my labels come out faded on one side only">one said differently</button></li>
+            </ul>
 
-        <div class="conversation" id="conversation" hidden>
-          <span>asked before this:</span>
-          <ol id="conversation-list"></ol>
-          <button type="button" id="forget" class="quiet">start again</button>
-        </div>
+            <form id="ask-form">
+              <label class="visually-hidden" for="question">Your question</label>
+              <input
+                type="text"
+                id="question"
+                placeholder="what does E-4412 mean"
+                autocomplete="off"
+                required
+              />
+              <button type="submit">Ask</button>
+            </form>
 
-        <ul class="try" id="try">
-          <li><button type="button" data-try="how heavy can the label stock be on the TP-40">a plain one</button></li>
-          <li><button type="button" data-try="what does E-4412 mean">a code</button></li>
-          <li><button type="button" data-try="what does NETWORK_MODE do">a setting</button></li>
-          <li>
-            <button type="button" data-try="and the TP-60?" data-after="what is the smallest margin the TP-40 will print">
-              one that leans on the last
-            </button>
-          </li>
-          <li><button type="button" data-try="my labels come out faded on one side only">one said differently</button></li>
-        </ul>
-      </section>
+            <p class="hint">
+              Nothing is generated. What comes back is the passage itself, with
+              the document and heading it came from; a sentence written
+              <em>about</em> it would be the part everybody reads and nobody can
+              check.
+            </p>
+
+            <button type="button" id="forget" class="quiet" hidden>start again</button>
+          </div>
+        </section>
+
+
+        <section class="answers" aria-label="What came back">
+          <!--
+            Before anything has been asked. Not an empty panel: the sentence
+            says what is about to happen, which is what somebody needs in the
+            ten seconds before they decide to type.
+          -->
+          <p class="nothing-yet" id="nothing-yet">
+            Ask something and it goes to <strong>both</strong> searches at once.
+            What comes back sits side by side, so the difference between them is
+            something you look at rather than something you are told.
+          </p>
+
+          <!-- The question, restated, above its own answer. -->
+          <h2 class="asked-now" id="asked-now" hidden></h2>
+
+          <!-- What the question was taken to be. --------------------------- -->
+          <section class="panel reading" id="reading" hidden>
+            <h2>What it made of the question</h2>
+            <ul id="reading-list"></ul>
+          </section>
+
+          <!-- The two answers, side by side. ------------------------------- -->
+          <div class="two" id="two" hidden>
+            <section class="panel answer plain">
+              <h2>Similarity alone</h2>
+              <p class="what">What almost every “chat with your documents” does: compare the question with every piece, return the nearest.</p>
+              <ol class="found" id="plain-found"></ol>
+            </section>
+
+            <section class="panel answer knowing">
+              <h2>Knowing what kind of question it is</h2>
+              <p class="what" id="knowing-how">—</p>
+              <ol class="found" id="knowing-found"></ol>
+            </section>
+          </div>
+
+          <p class="verdict" id="verdict" hidden></p>
+        </section>
+      </div>
 
       <!--
         The documents in play, and a way to add your own.
@@ -113,29 +180,6 @@
 
         <button type="button" class="quiet" id="reset">back to the three invented manuals</button>
       </details>
-
-      <!-- What the question was taken to be. ------------------------------- -->
-      <section class="panel reading" id="reading" hidden>
-        <h2>What it made of the question</h2>
-        <ul id="reading-list"></ul>
-      </section>
-
-      <!-- The two answers, side by side. ----------------------------------- -->
-      <div class="two" id="two" hidden>
-        <section class="panel answer plain">
-          <h2>Similarity alone</h2>
-          <p class="what">What almost every “chat with your documents” does: compare the question with every piece, return the nearest.</p>
-          <ol class="found" id="plain-found"></ol>
-        </section>
-
-        <section class="panel answer knowing">
-          <h2>Knowing what kind of question it is</h2>
-          <p class="what" id="knowing-how">—</p>
-          <ol class="found" id="knowing-found"></ol>
-        </section>
-      </div>
-
-      <p class="verdict" id="verdict" hidden></p>
     </main>
 
     <footer>
