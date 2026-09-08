@@ -42,6 +42,17 @@
   --chosen: #4b3bd6;
   --chosen-soft: #eceafb;
 
+  /*
+   * The same accent, for the masthead, where the ground is ink.
+   *
+   * Not a second colour: it is the violet `mark.svg` already uses for its
+   * stripe, which had to be lighter for exactly this reason. On paper
+   * `--chosen` reaches 8:1; on ink it falls to 2.4, under the 3:1 a border
+   * that carries meaning has to hold, so it would have been decoration
+   * pretending to be a signal.
+   */
+  --chosen-on-ink: #6a5cf0;
+
   --display: Fraunces, Georgia, 'Times New Roman', serif;
   --sans: system-ui, 'Segoe UI', -apple-system, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
@@ -78,37 +89,84 @@ body {
 
 /* ------------------------------------------------------------------- top */
 
+/*
+ * A masthead, because a page about printed manuals should begin like one.
+ *
+ * The ink band is the one dark thing here, and it earns being dark by being
+ * the only one: below it everything is paper, which is where the reading
+ * happens. It also gives the page a beginning, which a pale strip with a rule
+ * under it did not.
+ */
 .top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.2rem 2rem;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 1.8rem clamp(1rem, 4vw, 3rem) 1.5rem;
-  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem 2.5rem;
+  align-items: end;
+  padding: 1.9rem clamp(1rem, 4vw, 3rem) 1.7rem;
+  background: var(--ink);
+  color: var(--paper);
 }
 
-.wordmark { display: flex; gap: 0.9rem; align-items: flex-start; }
-.wordmark img { margin-top: 0.2rem; }
+.wordmark { display: flex; gap: 0.85rem; align-items: center; grid-column: 1; }
 
 .top h1 {
   margin: 0;
-  font: 600 1.6rem/1.1 var(--display);
-  font-variation-settings: 'SOFT' 30, 'WONK' 1, 'opsz' 20;
-  letter-spacing: -0.01em;
+  font: 600 clamp(1.7rem, 3.4vw, 2.4rem)/1 var(--display);
+  font-variation-settings: 'SOFT' 30, 'WONK' 1, 'opsz' 36;
+  letter-spacing: -0.015em;
 }
-.top p { margin: 0.4rem 0 0; color: var(--ink-soft); max-width: 56ch; font-size: 0.9rem; }
 
-.about { display: flex; gap: 1.4rem; margin: 0; }
+/*
+ * The claim, set as the shape it describes.
+ *
+ * "Answered twice" was a sentence in a paragraph, and it is the whole argument
+ * of the project. Written as two halves side by side, in the order the columns
+ * appear in below, the top of the page explains the bottom before anybody
+ * scrolls to it.
+ */
+.thesis {
+  grid-column: 1;
+  margin: 0;
+  max-width: 60ch;
+  color: #b9b3a6;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.thesis strong { color: var(--paper); font-weight: 600; }
+
+.halves { display: flex; gap: 0.5rem; margin: 0.55rem 0 0.6rem; flex-wrap: wrap; }
+.half {
+  flex: 1 1 12rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #3a3833;
+  border-radius: 3px;
+  font: 500 0.8rem/1.35 var(--sans);
+  color: #d6d0c3;
+}
+/* The accent means one thing on this page, and this is that thing said early:
+   the side that reads the question before it searches. */
+.half.is-knowing { border-color: var(--chosen-on-ink); color: #cfc9ff; }
+
+.about { display: flex; gap: 1.6rem; margin: 0; grid-column: 2; grid-row: 1 / span 2; align-self: end; }
 .about dt {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+  color: #979184;
 }
-.about dd { margin: 0.15rem 0 0; font: 600 1.15rem/1 var(--display); font-variant-numeric: tabular-nums; }
-.about .mono { font: 500 0.85rem/1.6 var(--mono); }
+.about dd {
+  margin: 0.2rem 0 0;
+  font: 600 1.4rem/1 var(--display);
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+.about .mono { font: 500 0.85rem/1.65 var(--mono); color: #d6d0c3; }
+
+@media (max-width: 48rem) {
+  .top { grid-template-columns: minmax(0, 1fr); }
+  .about { grid-column: 1; grid-row: auto; gap: 1.2rem; }
+}
 
 /* ---------------------------------------------------------------- panels */
 
@@ -278,16 +336,52 @@ button.quiet:hover { background: #f1ede3; color: var(--ink); }
 
 /* ------------------------------------------------------------ the two */
 
-.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+/*
+ * Two facing pages, and a gutter between them.
+ *
+ * The rule was already that the columns are identical — same width, same type,
+ * same everything — because a column given more room or a warmer colour argues
+ * for itself instead of letting the reader look. What is new is that the rule
+ * is visible: the gutter is a real gutter, so the page LOOKS like the
+ * comparison it is, and neither side gains anything by it.
+ */
+.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.two .answer { margin: 0; border: none; border-radius: 0; padding: 1.3rem 1.4rem 1.5rem; }
+
+/* The gutter. One pixel of the page showing between two sheets. */
+.two .answer.knowing { box-shadow: -1px 0 0 var(--line); }
 
 /*
- * The same width, the same type, the same everything. The preferred answer is
- * marked by a rule and by nothing else: a column made warmer or heavier would
- * be making the argument typographically instead of showing it.
+ * The running head, the way a manual carries one.
+ *
+ * It answers the question somebody actually has when two columns of passages
+ * appear: which of these is which. The heading below it names the method; this
+ * names the side.
  */
-.answer.knowing { border-left: 3px solid var(--chosen); }
+.running-head {
+  margin: 0 0 0.45rem;
+  font: 600 0.68rem/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+.answer.knowing .running-head { color: var(--chosen); }
 
-.answer .what { margin: 0 0 0.8rem; color: var(--ink-faint); font-size: 0.82rem; min-height: 2.6em; }
+/* The mark on the preferred side stays a rule, and stays the only mark. No
+   `!important` needed: this and `.two .answer` above both weigh (0,2,0), and
+   at equal weight the later rule wins, which is this one. */
+.answer.knowing { border-top: 3px solid var(--chosen); }
+
+.answer .what { margin: 0 0 0.9rem; color: var(--ink-faint); font-size: 0.82rem; min-height: 2.6em; }
 .answer.knowing .what { color: var(--chosen); }
 
 .found { list-style: none; margin: 0; padding: 0; }
@@ -315,11 +409,17 @@ blockquote {
 
 /* ------------------------------------------------------------- the verdict */
 
+/*
+ * The verdict belongs to both columns, so it sits under both and touches
+ * neither more than the other: centred, at the width of the pair, where the
+ * two pages meet.
+ */
 .verdict {
-  margin: 0.2rem 0 0;
-  padding: 0.8rem 1rem;
-  border-radius: 3px;
+  margin: 0;
+  padding: 0.75rem 1.1rem;
+  border-radius: 4px;
   font-size: 0.88rem;
+  text-align: center;
 }
 .verdict.different { background: var(--chosen-soft); color: #2f2596; }
 .verdict.same { background: #f1ede3; color: var(--ink-soft); }

@@ -9,18 +9,29 @@
   </head>
 
   <body>
+    <!--
+      A masthead, and it says the same thing the page below is shaped like.
+
+      "Answered twice" was a sentence in a paragraph. It is the whole argument,
+      so it is set as the two halves it describes, in the order the columns
+      appear in: whoever reads the top of this page has already been told what
+      the shape of the bottom means.
+    -->
     <header class="top">
       <div class="wordmark">
-        <img src="mark.svg" alt="" width="30" height="30" />
-        <div>
-          <h1>Ask the manuals</h1>
-          <p>
-            Every question is answered twice: the ordinary way, and by looking
-            at the question first. Both are shown, so the difference is
-            something you can see rather than something to take on trust.
-          </p>
-        </div>
+        <img src="mark.svg" alt="" width="46" height="46" />
+        <h1>Ask the manuals</h1>
       </div>
+
+      <p class="thesis">
+        Every question is answered <strong>twice</strong>
+        <span class="halves">
+          <span class="half">the ordinary way</span>
+          <span class="half is-knowing">by looking at the question first</span>
+        </span>
+        Both are shown, so the difference is something you can see rather than
+        something to take on trust.
+      </p>
 
       <dl class="about" id="about">
         <div><dt>documents</dt><dd id="about-documents">—</dd></div>
@@ -116,15 +127,26 @@
             <ul id="reading-list"></ul>
           </section>
 
-          <!-- The two answers, side by side. ------------------------------- -->
+          <!--
+            The two answers, as two facing pages.
+
+            Identical width, identical type: that was already the rule, because
+            a column given more room or a warmer colour argues for itself
+            instead of letting the reader look. What is new is that the rule
+            now shows. Each has a running head, the way a manual does, and they
+            face each other across a gutter — so the page looks like the
+            comparison it is, without either side being flattered.
+          -->
           <div class="two" id="two" hidden>
             <section class="panel answer plain">
+              <p class="running-head">what almost everything does</p>
               <h2>Similarity alone</h2>
-              <p class="what">What almost every “chat with your documents” does: compare the question with every piece, return the nearest.</p>
+              <p class="what">Compare the question with every piece, return the nearest.</p>
               <ol class="found" id="plain-found"></ol>
             </section>
 
             <section class="panel answer knowing">
+              <p class="running-head">what this one does</p>
               <h2>Knowing what kind of question it is</h2>
               <p class="what" id="knowing-how">—</p>
               <ol class="found" id="knowing-found"></ol>
