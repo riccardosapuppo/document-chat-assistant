@@ -247,6 +247,30 @@ footer p { margin: 0; color: var(--ink-faint); font-size: 0.82rem; max-width: 74
 footer code { font-family: var(--mono); font-size: 0.78rem; }
 footer .by { margin-top: 0.5rem; }
 
+/* The name in that line is the one link on the page, and it has to read as a
+   link without turning blue. So it takes no new colour: it steps up from the
+   faint grey the rest of the footer is set in to the grey this console already
+   uses for its secondary text, which is enough of a lift to be seen — and it
+   carries an underline, because at 0.82rem colour alone is not a signal
+   anybody should have to trust. Hover goes the last step to --ink, the way the
+   quiet buttons darken. The focus ring is the one the question field and the
+   buttons wear, so a keyboard lands on it visibly; the radius only keeps that
+   ring from cutting the corners of a small word. */
+footer .by a {
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  border-radius: 3px;
+}
+
+footer .by a:hover { color: var(--ink); }
+footer .by a:focus-visible { outline: 3px solid var(--chosen); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  footer .by a { transition: color 0.15s ease; }
+}
+
 @media (max-width: 62rem) {
   .two { grid-template-columns: minmax(0, 1fr); }
   .answer .what { min-height: 0; }

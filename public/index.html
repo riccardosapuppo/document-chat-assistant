@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ask the manuals — and see which search answered</title>
+    <title>Ask the manuals, and see which search answered</title>
     <link rel="icon" href="mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="console.css" />
   </head>
@@ -15,7 +15,7 @@
         <div>
           <h1>Ask the manuals</h1>
           <p>
-            Every question is answered twice — the ordinary way, and by looking
+            Every question is answered twice: the ordinary way, and by looking
             at the question first. Both are shown, so the difference is
             something you can see rather than something to take on trust.
           </p>
@@ -45,8 +45,8 @@
 
         <p class="hint">
           Nothing is generated. What comes back is the passage itself, with the
-          document and heading it came from — a sentence written <em>about</em>
-          the passage would be the part everybody reads and nobody can check.
+          document and heading it came from; a sentence written <em>about</em>
+          it would be the part everybody reads and nobody can check.
         </p>
 
         <div class="conversation" id="conversation" hidden>
@@ -98,16 +98,16 @@
 
         <p class="hint">
           <strong>Nothing is written to disk.</strong> A document you add lives in
-          memory and is gone when this stops &mdash; an upload folder on somebody
-          else&rsquo;s machine is a place to put things that should not be there. A
+          memory and is gone when this stops; an upload folder on somebody
+          else&rsquo;s machine is a place for things that should not be there. A
           PDF is read for the text it already carries; a scan has none, and says so.
         </p>
 
         <p class="hint">
           Adding a document <strong>rebuilds the whole index</strong>, not only its
-          own part. A document is found by names worked out against the
-          <em>whole</em> corpus &mdash; an ordinary word only becomes a name if it
-          appears nowhere else &mdash; so a fourth document can take a name away
+          own part. A document is found by names, worked out against the
+          <em>whole</em> corpus: an ordinary word only becomes a name if it
+          appears nowhere else, so a fourth document can take a name away
           from the second, and it should.
         </p>
 
@@ -140,12 +140,13 @@
 
     <footer>
       <p>
-        A demonstration — an independent reconstruction of a production system I
-        designed and developed. Everything is on this machine. No account, no key, no
+        A demonstration. It reconstructs a production system I designed and
+        developed; the original cannot be published, so this one was written
+        from scratch. Everything is on this machine: no account, no key, no
         model, no network — <code id="footer-embeddings">the local index</code> is
         built from the documents in <code>samples/</code> when the service starts.
       </p>
-      <p class="by">Ask the manuals 1.0.0 — developed by Riccardo Sapuppo</p>
+      <p class="by">Ask the manuals 1.0.0, developed by <a href="https://github.com/riccardosapuppo" target="_blank" rel="noopener noreferrer">Riccardo Sapuppo</a></p>
     </footer>
 
     <script type="module" src="console.js"></script>
