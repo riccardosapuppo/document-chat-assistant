@@ -255,7 +255,7 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 74  the cutting, the classifying, the naming, the vectors
+npm test              # 77  the cutting, the classifying, the naming, the vectors
 npm run measure       #      the claim, against twelve questions with known answers
 npm run check:screen  #  27  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen

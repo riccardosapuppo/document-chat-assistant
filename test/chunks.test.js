@@ -118,3 +118,65 @@ describe('a whole document', () => {
     }
   });
 });
+
+/**
+ * Where a piece begins, which nothing was looking after.
+ *
+ * The window backs off to a sentence boundary so a piece does not END
+ * mid-thought. Nothing did the same for the start: the next piece begins at a
+ * fixed step that knows nothing about where the last one really finished, and
+ * on continuous text with few full stops — an invoice, a table, a price list —
+ * it lands inside a word almost every time.
+ *
+ * That is the end somebody reads first. A passage offered as evidence that
+ * opens with "ota variabile" is one nobody can check, which is the only thing
+ * this project claims to be for.
+ */
+describe('where a piece begins', () => {
+  /** Continuous prose with no full stops, which is what a bill looks like. */
+  const flowing =
+    'AGGIORNAMENTO CORRISPETTIVI In questa bolletta sono stati aggiornati i seguenti corrispettivi: ' +
+    'voce di spesa per la materia energia con quota fissa e quota variabile applicata al consumo '.repeat(8);
+
+  /** Whether the first word of a piece is a whole word of the source. */
+  const startsWhole = (piece, source) => {
+    const first = piece.split(/\s/)[0];
+    if (!first) return true;
+    return new RegExp(`(^|\\s)${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(source);
+  };
+
+  it('is a word boundary, not wherever the step happened to land', () => {
+    for (const size of [200, 400, 900]) {
+      const pieces = windowed(flowing, { size, overlap: Math.floor(size / 5) });
+
+      for (const [at, piece] of pieces.entries()) {
+        assert.equal(
+          startsWhole(piece, flowing),
+          true,
+          `window ${size}, piece ${at + 1} begins mid-word: ${JSON.stringify(piece.slice(0, 40))}`
+        );
+      }
+    }
+  });
+
+  it('and the words are all still there, because the overlap already held them', () => {
+    // Trimming a fragment must not lose a word: the piece before it contains
+    // the whole one. If it did lose one, this would be a worse defect than the
+    // one being fixed, and a silent one.
+    const pieces = windowed(flowing, { size: 200, overlap: 40 });
+    const words = new Set(flowing.split(/\s+/).filter(Boolean));
+
+    for (const word of words) {
+      assert.ok(
+        pieces.some((piece) => piece.includes(word)),
+        `"${word}" is in the source and in no piece`
+      );
+    }
+  });
+
+  it('and a piece that begins the document is left alone', () => {
+    const [first] = windowed(flowing, { size: 200, overlap: 40 });
+
+    assert.ok(first.startsWith('AGGIORNAMENTO CORRISPETTIVI'), first.slice(0, 40));
+  });
+});

@@ -97,6 +97,25 @@ export function windowed(text, { size = 900, overlap = 180 } = {}) {
     const end = Math.min(at + wide, clean.length);
     let piece = clean.slice(at, end);
 
+    /*
+     * The start of a piece was protected by nothing.
+     *
+     * The back-off below moves the END of a piece to a sentence boundary, so
+     * one does not stop mid-thought. But the next piece starts at a fixed step
+     * that knows nothing about where the last one really finished, so it lands
+     * wherever it lands — and on continuous text with few full stops, an
+     * invoice or a table, most pieces begin in the middle of a word: "abile
+     * applicata", "ota variabile".
+     *
+     * That is the end a reader sees first. Nothing is lost by dropping the
+     * fragment: the whole word is in the piece before, which the overlap is
+     * there to guarantee.
+     */
+    if (at > 0 && /\w/.test(clean[at - 1] ?? '') && /^\w/.test(piece)) {
+      const space = piece.search(/\s/);
+      if (space > -1) piece = piece.slice(space + 1);
+    }
+
     if (end < clean.length) {
       // Back off to the last sentence boundary in the final stretch, so the
       // piece ends where a thought does. If there is not one — a table, a long

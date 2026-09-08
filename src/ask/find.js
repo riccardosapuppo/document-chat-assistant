@@ -222,12 +222,26 @@ export function byWhatKindOfQuestionItIs(question, index, { history = [], most =
     kind,
     asked,
     named,
-    how: [
-      'by meaning',
-      named.document ? `within ${named.document}, because ${named.why}` : null,
-      kind.standsAlone ? null : 'with the subject carried from the question before',
-    ]
-      .filter(Boolean)
-      .join(', '),
+    /*
+     * When nothing fired, say so.
+     *
+     * This branch runs the SAME function the other column runs, so the two
+     * come back identical — same passages, same scores. That is a true and
+     * frequent outcome and the verdict already says as much. But the column
+     * itself said only "by meaning", which reads, next to an identical list,
+     * as a demonstration that failed. It did not fail: there was nothing in
+     * the question for it to work with, and admitting that is the honest half
+     * of a claim to be better on the questions where there is.
+     */
+    how:
+      named.document || !kind.standsAlone
+        ? [
+            'by meaning',
+            named.document ? `within ${named.document}, because ${named.why}` : null,
+            kind.standsAlone ? null : 'with the subject carried from the question before',
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : 'by meaning, and nothing else: no literal to match, no document named, nothing carried over — so this is the same search as on the left',
   };
 }

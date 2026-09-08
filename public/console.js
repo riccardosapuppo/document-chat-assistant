@@ -115,6 +115,12 @@ async function ask(question, { quietly = false } = {}) {
   asked.push(said);
   answers.push(answer);
 
+  // The box empties, the way a box you have sent from does. Keeping the words
+  // there left the same question in three places at once — in the box, in the
+  // thread above it, and restated over its own answer — and the one still
+  // sitting in the box read like a draft that had not gone anywhere.
+  $('question').value = '';
+
   if (quietly) {
     drawTheConversation();
     return;
