@@ -51,6 +51,17 @@ npm install
 npm start        # the console on http://127.0.0.1:3700
 ```
 
+The page opens by itself. Not in CI, not with no terminal attached, and not when
+you say `--no-open` (or set `NO_OPEN=1`), and it says which of those happened: a
+launcher that blocks on a runner turns a green job into one that hangs for hours
+and is quietly cancelled. A port already taken is a sentence too, with the way
+out in it, rather than eleven lines of stack trace.
+
+```
+npm start -- --no-open
+PORT=3701 npm start
+```
+
 Then ask it something. Every question is answered **twice** (the ordinary way
 and by looking at the question first), and both are shown, so the difference is
 something you can see rather than a claim to take on trust.
@@ -244,7 +255,7 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 63  the cutting, the classifying, the naming, the vectors
+npm test              # 69  the cutting, the classifying, the naming, the vectors
 npm run measure       #      the claim, against twelve questions with known answers
 npm run check:screen  #  27  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen

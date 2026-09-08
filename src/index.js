@@ -20,6 +20,7 @@ import { api } from './http/api.js';
 import { buildAsync, readFolder } from './index/build.js';
 import { corpus } from './index/corpus.js';
 import { provider } from './index/embed.js';
+import { openInABrowser } from './open-a-browser.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +63,38 @@ const server = app.listen(PORT, HOST, () => {
     pieces: held.index.chunks.length,
     embeddings: held.index.provider,
   });
+
+  // The page, in front of whoever started this. Never in CI, never without a
+  // terminal, and never when told not to — see `open-a-browser.js`.
+  const browser = openInABrowser(`http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}/`);
+  log('info', browser.opened ? 'the page is open' : 'the page was not opened', { why: browser.why });
+});
+
+/**
+ * A port that is already taken is a sentence, not a stack trace.
+ *
+ * Node's default for this is eleven lines of `at Server.setupListenHandle`
+ * ending in EADDRINUSE, which says what happened to somebody who already knows
+ * and nothing at all to anybody else. It happens on every second start during
+ * development, and the thing the reader needs is the way out.
+ */
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    log('error', `something is already listening on ${HOST}:${PORT}`, {
+      likely: 'another copy of this service, or another project using the same port',
+      try: `PORT=${PORT + 1} npm start`,
+    });
+    process.exit(1);
+  }
+
+  if (error.code === 'EACCES') {
+    log('error', `not allowed to listen on port ${PORT}`, {
+      likely: 'ports below 1024 need privileges this process does not have',
+    });
+    process.exit(1);
+  }
+
+  throw error;
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
