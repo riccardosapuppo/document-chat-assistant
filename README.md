@@ -231,8 +231,8 @@ two kinds because they cannot follow the same rule:
   TP-60 opens by calling itself wide-format and nothing else in the folder uses
   the word.
 
-Four weaker versions of that second rule are recorded in the comments beside it,
-each with the wrong answer it produced.
+Three weaker versions of that second rule are recorded in the comments beside
+it, each with the wrong answer it produced.
 
 ---
 
