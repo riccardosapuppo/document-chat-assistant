@@ -31,7 +31,7 @@
  * and nothing else, and the console says so.
  */
 
-import { build } from './build.js';
+import { buildAsync } from './build.js';
 import { readPdfText } from '../text/pdf.js';
 
 /** What a document may arrive as. */
@@ -41,17 +41,48 @@ export const READS = ['.md', '.txt', '.pdf'];
 export const MOST_ONE_DOCUMENT = 4 * 1024 * 1024;
 export const MOST_ALTOGETHER = 12 * 1024 * 1024;
 
-export function corpus({ samples, provider, log = () => {} }) {
+/**
+ * The corpus, with its index already built when this resolves.
+ *
+ * Asynchronous because building an index is: see `buildAsync`. So are adding,
+ * removing and resetting, since each of them rebuilds.
+ */
+export async function corpus({ samples, provider, log = () => {} }) {
   /** The invented manuals. Never removed, so there is always something to ask. */
   const given = samples.map((one) => ({ ...one, given: true }));
 
   /** What somebody added, this run, in this process. */
   let added = [];
-  let index = build([...given, ...added], { provider });
+  let index = await buildAsync([...given, ...added], { provider });
 
-  function rebuild() {
-    index = build([...given, ...added], { provider });
-    return index;
+  /**
+   * A new index, after a change to what was added: one rebuild at a time, and
+   * nothing changed until it has finished.
+   *
+   * With embeddings that arrive over the network a rebuild takes as long as
+   * the network does, and somebody can remove a document while another is still
+   * being indexed. Two rebuilds at once finish in whatever order the network
+   * decides, and the one that finishes last wins whether or not it was asked
+   * for last. So each waits for the one before it, and makes its change to what
+   * that one left.
+   *
+   * The list of added documents changes with the index and never before it. A
+   * rebuild that fails leaves both as they were, rather than a document listed
+   * as added that no answer can ever come from.
+   */
+  let rebuilding = Promise.resolve();
+
+  function rebuild(change) {
+    const done = rebuilding.then(async () => {
+      const next = change(added);
+      index = await buildAsync([...given, ...next], { provider });
+      added = next;
+    });
+
+    // The next one waits for this one, whether it worked or not.
+    rebuilding = done.catch(() => {});
+
+    return done;
   }
 
   return {
@@ -75,8 +106,11 @@ export function corpus({ samples, provider, log = () => {} }) {
     /**
      * Add a document. Returns what happened, in words, rather than throwing —
      * a refused upload is an ordinary outcome and the page has to show it.
+     *
+     * What it does throw is a rebuild that failed, because that is nothing
+     * wrong with the document, and the document is not added when it does.
      */
-    add({ name, text, bytes }) {
+    async add({ name, text, bytes }) {
       const called = cleanName(name);
       if (!called.ok) return called;
 
@@ -98,14 +132,15 @@ export function corpus({ samples, provider, log = () => {} }) {
         };
       }
 
+      const before = index.documents.length;
+
       // Replacing rather than refusing a name already in play: dropping the
       // same file twice is something people do, and "there is already one
       // called that" is an unhelpful answer to it.
-      added = added.filter((one) => one.name !== called.name);
-      added.push({ name: called.name, text: got.text });
-
-      const before = index.documents.length;
-      rebuild();
+      await rebuild((now) => [
+        ...now.filter((one) => one.name !== called.name),
+        { name: called.name, text: got.text },
+      ]);
 
       log('info', 'a document was added', {
         name: called.name,
@@ -128,25 +163,21 @@ export function corpus({ samples, provider, log = () => {} }) {
     },
 
     /** Remove one that was added. The invented three cannot be removed. */
-    remove(name) {
+    async remove(name) {
       if (given.some((one) => one.name === name)) {
         return { ok: false, why: 'that is one of the invented manuals, and it stays' };
       }
 
-      const before = added.length;
-      added = added.filter((one) => one.name !== name);
+      if (!added.some((one) => one.name === name)) return { ok: false, why: `nothing here is called ${name}` };
 
-      if (added.length === before) return { ok: false, why: `nothing here is called ${name}` };
-
-      rebuild();
+      await rebuild((now) => now.filter((one) => one.name !== name));
       log('info', 'a document was removed', { name, documents: index.documents.length });
       return { ok: true, name };
     },
 
     /** Back to the three invented manuals. */
-    reset() {
-      added = [];
-      rebuild();
+    async reset() {
+      await rebuild(() => []);
       log('info', 'back to the invented manuals only', { documents: index.documents.length });
       return { ok: true, documents: index.documents };
     },

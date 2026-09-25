@@ -20,7 +20,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { build, readFolder } from '../src/index/build.js';
+import { buildAsync, readFolder } from '../src/index/build.js';
 import { provider } from '../src/index/embed.js';
 import { bySimilarityAlone, byWhatKindOfQuestionItIs } from '../src/ask/find.js';
 import { KINDS, QUESTIONS, foundIt, foundItAtAll } from '../src/measure/questions.js';
@@ -28,8 +28,12 @@ import { KINDS, QUESTIONS, foundIt, foundItAtAll } from '../src/measure/question
 const here = path.dirname(fileURLToPath(import.meta.url));
 const folder = path.join(here, '..', 'samples');
 
+// Awaited, here and for every question below. With EMBEDDINGS=openai the
+// vectors arrive over the network, and this once compared them before they had
+// arrived: every score 0, similarity alone at 0/12, and an exit code that said
+// all was well.
 const chosen = provider();
-const index = build(readFolder(folder), { provider: chosen });
+const index = await buildAsync(readFolder(folder), { provider: chosen });
 
 console.log(`  ${index.documents.length} documents, ${index.chunks.length} pieces, ${QUESTIONS.length} questions`);
 console.log(`  embeddings: ${index.provider}\n`);
@@ -43,13 +47,13 @@ if (index.lexical) {
 
 // --------------------------------------------------------------------- run it
 
-const results = QUESTIONS.map((one) => {
+const results = await Promise.all(QUESTIONS.map(async (one) => {
   const history = one.history ?? [];
 
   // The baseline gets the question exactly as it arrived, which is the whole
   // point of it being the baseline: it has nowhere to put the history.
-  const plain = bySimilarityAlone(one.ask, index);
-  const knowing = byWhatKindOfQuestionItIs(one.ask, index, { history });
+  const plain = await bySimilarityAlone(one.ask, index);
+  const knowing = await byWhatKindOfQuestionItIs(one.ask, index, { history });
 
   return {
     ...one,
@@ -61,7 +65,7 @@ const results = QUESTIONS.map((one) => {
       found: knowing.found,
     },
   };
-});
+}));
 
 // ---------------------------------------------------------------- the table
 

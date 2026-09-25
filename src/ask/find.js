@@ -36,10 +36,16 @@ const HEADING_COUNTS = 0.35;
 /**
  * The nearest chunks, by meaning alone.
  *
- * @returns {{ chunk: object, score: number, why: string }[]}
+ * Asynchronous, because the question's own vector can be. With a provider that
+ * fetches, it is still on its way when this is called, and a comparison made
+ * before it arrives is a comparison with a promise: every score 0, nothing
+ * found, and no error. The local provider's vector is there at once, and
+ * awaiting it changes nothing about it.
+ *
+ * @returns {Promise<{ chunk: object, score: number, why: string }[]>}
  */
-export function bySimilarityAlone(question, index, { most = 5, headingCounts = 0 } = {}) {
-  const asked = index.vectorFor(question);
+export async function bySimilarityAlone(question, index, { most = 5, headingCounts = 0 } = {}) {
+  const asked = await index.vectorFor(question);
   const inTheQuestion = new Set(meaningfulWords(question));
 
   return index.chunks
@@ -161,9 +167,9 @@ export function standingOnItsOwn(question, previous) {
 /**
  * The one to use.
  *
- * @returns {{ found: object[], kind: object, asked: string, how: string }}
+ * @returns {Promise<{ found: object[], kind: object, asked: string, how: string }>}
  */
-export function byWhatKindOfQuestionItIs(question, index, { history = [], most = 5 } = {}) {
+export async function byWhatKindOfQuestionItIs(question, index, { history = [], most = 5 } = {}) {
   const kind = whatKindOfQuestion(question, { history });
 
   // 1. If it does not stand on its own, make it — before anything is searched
@@ -208,7 +214,7 @@ export function byWhatKindOfQuestionItIs(question, index, { history = [], most =
     }
 
     return {
-      found: bySimilarityAlone(asked, searching, { most, headingCounts: HEADING_COUNTS }),
+      found: await bySimilarityAlone(asked, searching, { most, headingCounts: HEADING_COUNTS }),
       kind,
       asked,
       named,
@@ -218,7 +224,7 @@ export function byWhatKindOfQuestionItIs(question, index, { history = [], most =
 
   // 4. Otherwise, meaning — which is what it is good at.
   return {
-    found: bySimilarityAlone(asked, searching, { most, headingCounts: HEADING_COUNTS }),
+    found: await bySimilarityAlone(asked, searching, { most, headingCounts: HEADING_COUNTS }),
     kind,
     asked,
     named,

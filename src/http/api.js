@@ -96,15 +96,17 @@ export function api({ corpus, log = () => {} }) {
    * is having it, and a service that remembers one is a service that has to be
    * told when somebody has finished.
    */
-  app.post('/api/ask', (request, response) => {
+  app.post('/api/ask', awaited(async (request, response) => {
     const question = String(request.body?.question ?? '').trim();
     const history = Array.isArray(request.body?.history) ? request.body.history.map(String) : [];
 
     if (!question) return response.status(400).json({ error: 'what is the question?' });
 
+    // Taken once, so both searches are over the same index: with embeddings
+    // that arrive over the network, a rebuild can finish between the two.
     const index = theIndex();
-    const plain = bySimilarityAlone(question, index, { most: 4 });
-    const knowing = byWhatKindOfQuestionItIs(question, index, { history, most: 4 });
+    const plain = await bySimilarityAlone(question, index, { most: 4 });
+    const knowing = await byWhatKindOfQuestionItIs(question, index, { history, most: 4 });
 
     const same = plain[0]?.chunk.id === knowing.found[0]?.chunk.id;
 
@@ -128,7 +130,7 @@ export function api({ corpus, log = () => {} }) {
       plain: plain.map(asAnswer),
       knowing: knowing.found.map(asAnswer),
     });
-  });
+  }));
 
   /**
    * Add a document, and ask questions about it.
@@ -144,7 +146,7 @@ export function api({ corpus, log = () => {} }) {
    * machine somebody else is running is a place to put things that should not
    * be there, and this is a demonstration anybody can open.
    */
-  app.post('/api/documents', (request, response) => {
+  app.post('/api/documents', awaited(async (request, response) => {
     const name = String(request.body?.name ?? "").trim();
     if (!name) return response.status(400).json({ ok: false, why: "that upload has no file name" });
 
@@ -155,7 +157,7 @@ export function api({ corpus, log = () => {} }) {
       return response.status(400).json({ ok: false, why: "send either text or base64" });
     }
 
-    const said = corpus.add({
+    const said = await corpus.add({
       name,
       text,
       bytes: typeof base64 === "string" ? Buffer.from(base64, "base64") : null,
@@ -171,21 +173,21 @@ export function api({ corpus, log = () => {} }) {
       documents: theIndex().documents,
       pieces: theIndex().chunks.length,
     });
-  });
+  }));
 
   /** Remove one that was added. The invented three stay. */
-  app.delete('/api/documents/:name', (request, response) => {
-    const said = corpus.remove(request.params.name);
+  app.delete('/api/documents/:name', awaited(async (request, response) => {
+    const said = await corpus.remove(request.params.name);
     if (!said.ok) return response.status(404).json(said);
 
     response.json({ ...said, documents: theIndex().documents, pieces: theIndex().chunks.length });
-  });
+  }));
 
   /** Back to the three invented manuals. */
-  app.post('/api/documents/reset', (_request, response) => {
-    corpus.reset();
+  app.post('/api/documents/reset', awaited(async (_request, response) => {
+    await corpus.reset();
     response.json({ ok: true, documents: theIndex().documents, pieces: theIndex().chunks.length });
-  });
+  }));
 
   app.use((error, _request, response, _next) => {
     log('error', 'the request could not be handled', { why: error.message });
@@ -193,6 +195,18 @@ export function api({ corpus, log = () => {} }) {
   });
 
   return app;
+}
+
+/**
+ * A route that awaits, with its failure handed to Express.
+ *
+ * Express 4 ignores the promise a handler returns, so a rejection there (the
+ * embeddings service refusing a question, say) never reaches the error handler
+ * above: the request hangs until the browser gives up, and Node, which ends
+ * the process on a rejection nobody handled, takes the service down with it.
+ */
+function awaited(handler) {
+  return (request, response, next) => handler(request, response, next).catch(next);
 }
 
 /** A retrieved passage, as something a screen can show and a person can check. */

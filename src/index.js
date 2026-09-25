@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { api } from './http/api.js';
-import { buildAsync, readFolder } from './index/build.js';
+import { readFolder } from './index/build.js';
 import { corpus } from './index/corpus.js';
 import { provider } from './index/embed.js';
 import { openInABrowser } from './open-a-browser.js';
@@ -40,10 +40,6 @@ if (documents.length === 0) {
   process.exit(1);
 }
 
-// The remote provider fetches; the local one does not. Both are awaited so the
-// service never starts answering from a half-built index.
-if (chosen.needsNetwork) await buildAsync(documents, { provider: chosen });
-
 /**
  * The documents in play, which is not a fixed set.
  *
@@ -51,8 +47,13 @@ if (chosen.needsNetwork) await buildAsync(documents, { provider: chosen });
  * and doing so rebuilds the whole index rather than appending to it -- because
  * a document is FOUND by names worked out against the whole corpus, and a
  * fourth document can take a name away from the second. See corpus.js.
+ *
+ * Awaited before the port is bound, whichever provider is in use. This used to
+ * await a build of its own for the remote one and then throw it away, while
+ * the corpus built the index it really answered from without waiting: every
+ * vector in it a promise, and every question compared with nothing.
  */
-const held = corpus({ samples: documents, provider: chosen, log });
+const held = await corpus({ samples: documents, provider: chosen, log });
 
 const app = api({ corpus: held, log });
 

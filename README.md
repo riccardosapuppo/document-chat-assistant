@@ -179,6 +179,10 @@ and the table changes shape. The console and the report always say which
 provider produced the numbers, because a table that did not would be a table
 about nothing.
 
+`npm test` runs that path against a stand-in for the service, with no key and
+no network. It once measured nothing: the vectors were compared before they had
+arrived, and similarity alone scored 0/12 without an error.
+
 ---
 
 ## What it made of the question
@@ -255,7 +259,7 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 77  the cutting, the classifying, the naming, the vectors
+npm test              # 85  the cutting, the classifying, the naming, the vectors
 npm run measure       #      the claim, against twelve questions with known answers
 npm run check:screen  #  27  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen
