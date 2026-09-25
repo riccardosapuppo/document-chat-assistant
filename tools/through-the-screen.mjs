@@ -238,9 +238,127 @@ async function run() {
     );
 
     is('removing it puts the index back', Number(await page.textContent('#about-documents')), 3);
+
+    // ---------------------------------- 7. a PDF with a page it cannot read
+    //
+    // A typed page and a scanned one. Nothing here reads pixels, so the typed
+    // page is indexed and the other is named: a page left out without a word
+    // is a question about it answered from the wrong place without a word.
+    say('a PDF with a scanned page in it');
+
+    await page.setInputFiles('#file', {
+      name: 'dehumidifier-manual.pdf',
+      mimeType: 'application/pdf',
+      buffer: aPdf([
+        typed([
+          'Brightwater B2 dehumidifier',
+          'Emptying the tank',
+          'The tank holds 2.5 litres, and the fan stops when it is full.',
+        ]),
+        scanned(),
+      ]),
+    });
+
+    await page.waitForFunction(
+      () => Number(document.getElementById('about-documents').textContent) === 4,
+      { timeout: 10000 }
+    );
+
+    is(
+      'the page that carries its text is indexed, and the count says so',
+      Number(await page.textContent('#about-documents')),
+      4
+    );
+
+    has(
+      'the screen names the page it could not read, and why',
+      await text(page, '#not-read'),
+      'Page 2 was not read: it has no text layer'
+    );
+
+    has(
+      'and the list of documents goes on saying so',
+      await text(page, '.documents li[data-given="false"]'),
+      'Page 2 was not read'
+    );
+
+    await ask(page, 'how much does the dehumidifier tank hold');
+    has(
+      'a question about the typed page is answered out of it',
+      await page.locator('#knowing-found li.first .where').textContent(),
+      'dehumidifier-manual'
+    );
+
+    await page.locator('[data-remove]').click();
+    await page.waitForFunction(
+      () => Number(document.getElementById('about-documents').textContent) === 3,
+      { timeout: 10000 }
+    );
+
+    // And one that is a scan and nothing else, which was refused before this
+    // reader and still is, now saying which page and why.
+    await page.setInputFiles('#file', {
+      name: 'all-of-it-scanned.pdf',
+      mimeType: 'application/pdf',
+      buffer: aPdf([scanned()]),
+    });
+
+    await page.waitForFunction(() => document.getElementById('added').dataset.trouble === 'yes', { timeout: 10000 });
+
+    has(
+      'a PDF with no page it can read is refused, naming the page',
+      await text(page, '#added'),
+      'page 1 has no text layer'
+    );
   } finally {
     await browser.close();
   }
+}
+
+// ------------------------------------------------------------- a PDF, made
+
+/**
+ * A PDF built here, one content stream to a page.
+ *
+ * No browser prints a scan, so the page that is one is made the way a scanner
+ * makes it: a picture, and nothing else on the page.
+ */
+function aPdf(pages) {
+  const stream = (content, dict = '') =>
+    `<< ${dict}/Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`;
+
+  const objects = new Map([
+    [1, '<< /Type /Catalog /Pages 2 0 R >>'],
+    [3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'],
+    [4, stream('\x80', '/Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 ')],
+  ]);
+
+  const ids = pages.map((_, at) => 5 + at * 2);
+  objects.set(2, `<< /Type /Pages /Kids [${ids.map((id) => `${id} 0 R`).join(' ')}] /Count ${pages.length} >>`);
+
+  pages.forEach((content, at) => {
+    objects.set(
+      ids[at],
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+        `/Resources << /Font << /F1 3 0 R >> /XObject << /Im1 4 0 R >> >> /Contents ${ids[at] + 1} 0 R >>`
+    );
+    objects.set(ids[at] + 1, stream(content));
+  });
+
+  let out = '%PDF-1.4\n';
+  for (const id of [...objects.keys()].sort((a, b) => a - b)) out += `${id} 0 obj\n${objects.get(id)}\nendobj\n`;
+
+  return Buffer.from(`${out}trailer\n<< /Root 1 0 R >>\n%%EOF`, 'latin1');
+}
+
+/** A page of typed lines, in a font with no surprises in it. */
+function typed(lines) {
+  return `BT /F1 12 Tf 72 720 Td ${lines.map((line) => `(${line}) Tj`).join(' 0 -18 Td ')} ET`;
+}
+
+/** A page that is a picture and nothing else, which is what a scan is. */
+function scanned() {
+  return 'q 612 0 0 792 0 0 cm /Im1 Do Q';
 }
 
 // --------------------------------------------------------------------- small

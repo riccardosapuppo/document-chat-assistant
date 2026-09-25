@@ -21,7 +21,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { hasTextLayer, readPdfText } from '../src/text/pdf.js';
+import { hasTextLayer, readPdfText } from '../src/text/pdf-text.js';
 
 /**
  * The smallest PDF that carries a text layer: one page, one font, one CMap.

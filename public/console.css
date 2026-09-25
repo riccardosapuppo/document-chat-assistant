@@ -546,6 +546,10 @@ details.corpus > *:last-child { margin-bottom: 1.3rem; }
 .documents .given { color: var(--ink-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .documents button { margin-left: auto; }
 
+/* The pages of a document that are not in the index: a line of its own under
+ * the rest, in the amber that means "not taken" (see `.added` below). */
+.documents .not-read { flex-basis: 100%; color: #8a5a00; font-size: 0.78rem; }
+
 /* ------------------------------------------------------------- adding one */
 
 .drop {
@@ -585,9 +589,12 @@ details.corpus > *:last-child { margin-bottom: 1.3rem; }
   font-size: 0.85rem;
 }
 
-/* Amber, and it means one thing: this document was not taken, and here is why.
- * Never used for anything else on this page. */
+/* Amber, and it means one thing: this was not taken, and here is why. A whole
+ * document, or pages of one that was, which is why a document can be told in
+ * violet and its missing pages in amber underneath. Never used for anything
+ * else on this page. */
 .added[data-trouble='yes'] { background: #fdf3e0; color: #8a5a00; }
+.added + .added { margin-top: 0.4rem; }
 
 @media (max-width: 42rem) {
   .documents li { flex-direction: column; gap: 0.2rem; }

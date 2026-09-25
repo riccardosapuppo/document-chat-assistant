@@ -284,11 +284,15 @@ function saySoFar(documents) {
     .map((one) => {
       const names = (one.called ?? []).slice(0, 4).join(", ");
 
+      // The pages of it that are not in the index, for as long as it is in the
+      // list. Said once, when it was added, and then only by the next message
+      // replacing that one, it would be a page dropped quietly after all.
       return `<li data-given="${one.given}">
         <span class="what">${escaped(one.name)}</span>
         <span class="how-many">${one.pieces} pieces</span>
         <span class="called">${names ? `found by: ${escaped(names)}` : "no name of its own"}</span>
         ${one.given ? "<span class=\"given\">invented</span>" : `<button type="button" class="quiet" data-remove="${escaped(one.name)}">remove</button>`}
+        ${one.notRead ? `<span class="not-read">${escaped(one.notRead)}</span>` : ""}
       </li>`;
     })
     .join("");
@@ -309,11 +313,23 @@ function escaped(text) {
   return box.innerHTML;
 }
 
-function tell(words, trouble = false) {
+/**
+ * What happened to the last thing dropped here.
+ *
+ * `notRead` is the pages of a document that was taken and are not in the
+ * index, as the service said them. They go on a line of their own, under the
+ * line saying what was taken, in the colour that means "not taken", and
+ * whatever is said next clears them.
+ */
+function tell(words, trouble = false, notRead = null) {
   const el = $("added");
   el.hidden = false;
   el.textContent = words;
   el.dataset.trouble = trouble ? "yes" : "no";
+
+  const left = $("not-read");
+  left.hidden = !notRead;
+  left.textContent = notRead ?? "";
 }
 
 async function showDocuments() {
@@ -363,7 +379,9 @@ async function add(file) {
 
   tell(
     `${said.name}: ${said.characters.toLocaleString("en-GB")} characters, ` +
-      `${said.pieces} pieces in the index. Ask it something.`
+      `${said.pieces} pieces in the index. Ask it something.`,
+    false,
+    said.notRead
   );
 
   await showDocuments();

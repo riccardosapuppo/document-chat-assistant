@@ -76,14 +76,25 @@ export function api({ corpus, log = () => {} }) {
 
   /** What is indexed, and what each document is called. */
   app.get('/api/documents', (_request, response) => {
+    const held = corpus.documents;
+
     response.json({
-      documents: theIndex().documents.map((name) => ({
-        name,
-        pieces: theIndex().chunks.filter((one) => one.document === name).length,
-        called: theIndex().called?.get(name) ?? [],
-        // Which of them are the invented manuals, and which somebody added.
-        given: corpus.documents.find((one) => one.name === name)?.given ?? false,
-      })),
+      documents: theIndex().documents.map((name) => {
+        const one = held.find((each) => each.name === name);
+
+        return {
+          name,
+          pieces: theIndex().chunks.filter((piece) => piece.document === name).length,
+          called: theIndex().called?.get(name) ?? [],
+          // Which of them are the invented manuals, and which somebody added.
+          given: one?.given ?? false,
+          // The pages of a PDF that are not in the index, and why, for as long
+          // as it is here: a list that stopped saying so after the upload would
+          // be a page dropped quietly, only later.
+          unread: one?.unread ?? [],
+          notRead: one?.notRead ?? null,
+        };
+      }),
       addedCharacters: corpus.addedCharacters,
     });
   });
@@ -145,6 +156,13 @@ export function api({ corpus, log = () => {} }) {
    * with the process. That is not a missing feature: an upload folder on a
    * machine somebody else is running is a place to put things that should not
    * be there, and this is a demonstration anybody can open.
+   *
+   * A PDF comes back with `pages`, how many it has, and `unread`, the pages
+   * that are not in the index, each with the reason, numbered from one and
+   * empty when every page was read. `notRead` says the same as a sentence, or
+   * is null. A PDF with no page that can be read is refused, with `unread` as
+   * well. See the top of `src/index/corpus.js` for why the one is indexed and
+   * the other is not.
    */
   app.post('/api/documents', awaited(async (request, response) => {
     const name = String(request.body?.name ?? "").trim();

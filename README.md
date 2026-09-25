@@ -76,11 +76,43 @@ somebody actually cares about, so the console takes **`.md`, `.txt` and `.pdf`**
 (dropped on it, or chosen) and indexes them beside the manuals.
 
 A PDF is read for the text it already carries. That reader
-([`src/text/pdf.js`](src/text/pdf.js)) is copied from a sibling project, where
-the argument was that most PDFs already contain their text and recognising it
-from the pixels instead is slower, costs money per page, and gives a worse
-answer than the one that was already there. **A scan has no text to find**, and
-is refused saying exactly that rather than indexed as an empty document.
+([`src/text/pdf-text.js`](src/text/pdf-text.js)) is copied from a sibling
+project, [document-ocr-service](https://github.com/riccardosapuppo/document-ocr-service),
+where the argument was that most PDFs already contain their text and
+recognising it from the pixels instead is slower, costs money per page, and
+gives a worse answer than the one that was already there. It is that project's
+file unedited, under a comment naming the commit it was copied at, so the two
+can be compared with `diff` and brought back into step by copying it again.
+
+**It reads a page at a time, and uses a page only when every glyph on it can be
+read as a character.** A page with no text layer (a scan, or text drawn as
+shapes), a page in a font nothing in the file explains (a CID font with no
+`ToUnicode` map, a Type3 font, a font the page names and the file does not
+hold), a page whose map leaves out a code it shows, text shown in a way the
+reader does not parse, content it cannot decompress: each is set aside, with
+the reason. The copy this replaced read them anyway. A font with no map put
+`$%&'(` in the index for ABCDE, a Word export went in without a single *e*, and
+a document whose second page was a scan went in as its first page, with nothing
+to say the second was missing.
+
+**What becomes of a page set aside is decided here**, because nothing here
+reads pixels. The document is indexed from the pages that carry their text, and
+the others are named, with the reason, wherever the document is: in the answer
+to the upload (`unread`, and the same as a sentence in `notRead`), on the screen
+under what was added, in the list of documents for as long as it is there, and
+in the log. A question whose answer is on one of those pages is answered from
+somewhere else, and the sentence says that too. The sibling refuses such a
+document when it has no key, and rightly, because a key would read the page.
+Here none would, so a refusal would be for good: a contract turned away for its
+scanned signature page, a manual for the photograph on its cover.
+
+**A PDF with no page this can read** (a scan, or a font nothing explains on
+every page) is refused, and the refusal names the pages and the reason, rather
+than indexing an empty document. So is an encrypted one, as encrypted. Three
+things it still misses without knowing, the same three the sibling names: text
+inside a form or a form field, words inside a picture on a page that also has
+text of its own, and characters past ASCII in a simple font with no map, where
+a euro sign comes out as a control character.
 
 **Nothing is written to disk.** What you add lives in memory and is gone when
 the service stops. That is not a missing feature: an upload folder on a machine
@@ -112,7 +144,10 @@ be discovered.
 Seven of the checks in `npm run check:screen` are this path: a document that did
 not exist when the service started is dropped in, asked about, found by a name
 derived from its own words, while the three invented manuals still answer as
-they did, which is the half that breaks if the rebuild is wrong.
+they did, which is the half that breaks if the rebuild is wrong. Five more drop
+in PDFs built for the purpose, since no browser prints a scan: one whose second
+page is a scan, indexed from its first while the screen and the list name the
+page left out, and one that is a scan and nothing else, refused by page.
 
 ## The measurement
 
@@ -261,9 +296,9 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 85  the cutting, the classifying, the naming, the vectors
+npm test              # 115  the cutting, the classifying, the naming, the vectors, the PDFs
 npm run measure       #      the claim, against twelve questions with known answers
-npm run check:screen  #  27  the console, driven with a browser
+npm run check:screen  #  32  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen
 npm run check:serving #  22  nobody can be handed yesterday's page
 ```
