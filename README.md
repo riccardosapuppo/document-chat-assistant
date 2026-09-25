@@ -147,9 +147,11 @@ got right is traded away.
 
 **literal**: `E-4412`, `NETWORK_MODE`. A code has no semantic neighbours: it is
 an arbitrary string, so its embedding is near other arbitrary strings, which is
-to say near nothing. Asked "what does E-4412 mean", plain similarity returns the
-passage most *about* fault codes in general. The right tool is a literal match,
-and the branch that fires says so on screen.
+to say near nothing. The local index goes wrong another way. Asked "what does
+E-4412 mean", plain similarity returns the section on W-3011, a different code,
+whose only word in common with the question is "does". The introduction to the
+fault codes comes second, and the section on E-4412 third. The right tool is a
+literal match, and the branch that fires says so on screen.
 
 **leaning**: "and the TP-60?", "is it the same part?". Not questions at all on
 their own. Embed one and you get the centre of every short vague sentence in the
