@@ -1,5 +1,5 @@
 /*
- * Copied from document-ocr-service, src/ocr/pages.js at commit 60c706b, for
+ * Copied from document-ocr-service, src/ocr/pages.js at commit 7c7f968, for
  * pdf-text.js beside it, and unedited for the same reason. The chat names
  * pages with it too, so a page is said the way the reader says it.
  */

@@ -114,6 +114,17 @@ inside a form or a form field, words inside a picture on a page that also has
 text of its own, and characters past ASCII in a simple font with no map, where
 a euro sign comes out as a control character.
 
+**A PDF built to be slow, or to fill the memory, is bounded.** This is one
+process on one thread that anybody can open, so a file that took a minute to
+read would take that minute from everybody. The reader goes through a page's
+content once, however many strings or brackets are left open in it, so a file
+built of them is read in milliseconds rather than minutes. And it inflates a
+compressed stream against a ceiling, 32 MB for one stream and 128 MB for a
+document, enforced as the bytes come out: a few kilobytes can be built to
+become gigabytes, and the 4 MB limit in `corpus.js` is on the text that comes
+out, which would be too late. A page that reaches the ceiling is set aside, with
+the reason, like any content the reader cannot decompress.
+
 **Nothing is written to disk.** What you add lives in memory and is gone when
 the service stops. That is not a missing feature: an upload folder on a machine
 somebody else is running is a place to put things that should not be there, and
@@ -296,7 +307,7 @@ demonstration, not a benchmark result.
 ## What it is checked with
 
 ```bash
-npm test              # 115  the cutting, the classifying, the naming, the vectors, the PDFs
+npm test              # 121  the cutting, the classifying, the naming, the vectors, the PDFs
 npm run measure       #      the claim, against twelve questions with known answers
 npm run check:screen  #  32  the console, driven with a browser
 npm run check:mark    #  11  the icon, at the size it is actually seen

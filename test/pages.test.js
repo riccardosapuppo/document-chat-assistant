@@ -12,7 +12,7 @@ import { readPdfText } from '../src/text/pdf-text.js';
 
 /*
  * From here to the end of the first `describe`, this is document-ocr-service's
- * test/pages.test.js at commit 60c706b, unedited: the reader, a page at a time.
+ * test/pages.test.js at commit 7c7f968, unedited: the reader, a page at a time.
  * The rest of that file is about what that service then does with a page the
  * reader sets aside, which is not what this repository does, and in its place
  * is this repository's own.

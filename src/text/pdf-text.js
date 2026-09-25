@@ -1,5 +1,5 @@
 /*
- * Copied from document-ocr-service, src/ocr/pdf-text.js at commit 60c706b.
+ * Copied from document-ocr-service, src/ocr/pdf-text.js at commit 7c7f968.
  * Everything below this comment is that file, unedited, so the two can be
  * compared with diff and brought back into step by copying it again and
  * changing the commit here. The same goes for pages.js, which it imports.
@@ -77,6 +77,30 @@ const A_SPACE = 0.18;
  */
 const A_KERNED_SPACE = 120;
 
+/**
+ * How far one stream may inflate, and how far a whole document may, before this
+ * stops decompressing.
+ *
+ * A FlateDecode stream says nothing about how large it becomes: a few kilobytes
+ * of zeros inflate to gigabytes, and on a service with one thread one upload
+ * built that way is everybody's memory and everybody's time. The only streams
+ * this reader inflates are page content — the operators that place text — and
+ * the ToUnicode maps; a real one of either is tens of kilobytes, and a page
+ * that is one dense vector drawing is a few megabytes. So the per-stream ceiling
+ * is set far above anything usable and far below anything ruinous, and the
+ * per-document ceiling caps a file of many streams so no single upload can make
+ * this process inflate more than a fraction of a gigabyte.
+ *
+ * They are enforced AS the bytes are produced — `maxOutputLength` stops zlib in
+ * the middle rather than after — so a bomb is never fully built, not even once.
+ * A stream that reaches its ceiling, or a document that reaches the total, is
+ * treated exactly as one this reader cannot decode: the page is set aside with
+ * a reason and goes to the engine that reads pixels, or into the refusal when
+ * there is no key. Never a crash, a hang, or a 500.
+ */
+const A_STREAM_MAY_INFLATE_TO = 32 * 1024 * 1024;
+const A_DOCUMENT_MAY_INFLATE_TO = 128 * 1024 * 1024;
+
 /** Why a page with nothing to read, and something drawn on it, is set aside. */
 const NO_LAYER = 'no text layer — a scan, or text drawn as shapes';
 
@@ -129,7 +153,12 @@ export function readPdfText(bytes) {
 
   if (objects.size === 0) return nothing('no objects could be read out of it');
 
-  const readings = fontReadings(objects);
+  // One budget for the whole document, spent as streams are inflated. See
+  // A_DOCUMENT_MAY_INFLATE_TO. readPdfText runs start to finish with no `await`,
+  // so this object belongs to exactly one document at a time.
+  const budget = { perStream: A_STREAM_MAY_INFLATE_TO, remaining: A_DOCUMENT_MAY_INFLATE_TO };
+
+  const readings = fontReadings(objects, budget);
   const fonts = [...readings.values()].filter((one) => one.chars).length;
   const widths = widthTables(objects);
   const { pages, ordered, whole } = pagesOf(objects, raw);
@@ -140,7 +169,9 @@ export function readPdfText(bytes) {
     return nothing('its page tree names pages this reader could not find, so it cannot say which it missed', fonts);
   }
 
-  const said = whatWasRead(pages.map((page) => readPage(page, objects, facesOf(page, objects, readings, widths))));
+  const said = whatWasRead(
+    pages.map((page) => readPage(page, objects, facesOf(page, objects, readings, widths, budget), budget))
+  );
 
   // With no page tree, the pages are in the order the file holds them. That is
   // the order every producer this has met writes them in, and it is not a
@@ -174,8 +205,8 @@ function nothing(why, fonts = 0) {
  * nothing on it; counting the operator rather than what it showed would send a
  * blank page to be recognised, or refuse the document for want of a key.
  */
-function readPage(page, objects, faces) {
-  const content = contentOf(page, objects);
+function readPage(page, objects, faces, budget) {
+  const content = contentOf(page, objects, budget);
   if (content === null) return { text: '', why: UNDECODABLE };
 
   const drawn = textIn(content, faces);
@@ -201,12 +232,12 @@ function readPage(page, objects, faces) {
  * reader looks for it (inside a compressed object stream), is a font nothing
  * is known about, and its codes are no more characters than a CID font's.
  */
-function facesOf(page, objects, readings, widths) {
+function facesOf(page, objects, readings, widths, budget) {
   const faces = new Map();
 
   for (const [name, id] of page.fonts) {
     const entry = objects.get(id);
-    const reading = readings.get(id) ?? (entry ? readingOf(entry, objects) : NOT_FOUND);
+    const reading = readings.get(id) ?? (entry ? readingOf(entry, objects, budget) : NOT_FOUND);
 
     faces.set(name, { ...reading, name: `/${name}`, wide: widths.get(id) ?? null });
   }
@@ -303,7 +334,7 @@ function findObjects(raw, bytes) {
  * nothing on it, and a reader that tells a blank page from a scan by what is
  * drawn on it would call that page blank and move on without it.
  */
-function streamOf(entry) {
+function streamOf(entry, budget) {
   if (!entry) return null;
 
   const at = entry.dict.indexOf('stream');
@@ -323,16 +354,26 @@ function streamOf(entry) {
   let out = entry.bytes.subarray(from, ends);
 
   if (filters.length === 1) {
+    // Bounded by what is left of this document's budget, and never more than one
+    // stream's worth. `maxOutputLength` makes zlib throw the moment the output
+    // would pass the ceiling, so a stream built to inflate to gigabytes is
+    // stopped in the middle and set aside, not decompressed and then measured.
+    const ceiling = Math.max(0, Math.min(budget.perStream, budget.remaining));
     try {
-      out = zlib.inflateSync(out);
+      out = zlib.inflateSync(out, { maxOutputLength: ceiling });
     } catch {
       try {
         // Some producers omit the zlib header. Raw deflate is the same data.
-        out = zlib.inflateRawSync(out);
+        out = zlib.inflateRawSync(out, { maxOutputLength: ceiling });
       } catch {
+        // A stream this cannot decode, whether the filter is unknown, the bytes
+        // are corrupt, or it ran past the ceiling. All three are the same
+        // answer to the page that holds it: content this reader cannot decode.
         return null;
       }
     }
+
+    budget.remaining -= out.length;
   }
 
   return out;
@@ -373,11 +414,11 @@ function filtersOf(head) {
  * A page that shows a single code in the last way, or one its map leaves out,
  * is not read from its text layer at all. See `readPage`.
  */
-function fontReadings(objects) {
+function fontReadings(objects, budget) {
   const readings = new Map();
 
   for (const entry of objects.values()) {
-    if (/\/Type\s*\/Font\b/.test(entry.dict)) readings.set(entry.id, readingOf(entry, objects));
+    if (/\/Type\s*\/Font\b/.test(entry.dict)) readings.set(entry.id, readingOf(entry, objects, budget));
   }
 
   return readings;
@@ -389,13 +430,13 @@ function fontReadings(objects) {
  *   composite (CID) font; and, when its codes cannot be turned into
  *   characters, why not.
  */
-function readingOf(entry, objects) {
+function readingOf(entry, objects, budget) {
   const kind = entry.dict.match(/\/Subtype\s*\/([A-Za-z0-9]+)/)?.[1];
   const composite = kind === 'Type0';
 
   const ref = entry.dict.match(/\/ToUnicode\s+(\d+)\s+\d+\s+R/);
   if (ref) {
-    const stream = streamOf(objects.get(Number(ref[1])));
+    const stream = streamOf(objects.get(Number(ref[1])), budget);
     if (!stream) {
       return { chars: null, bytes: composite ? 2 : 1, composite, unreadable: 'its ToUnicode map cannot be decoded' };
     }
@@ -521,19 +562,46 @@ function balanced(source, key, open, close) {
 }
 
 /**
+ * Each run between an opening keyword and the next closing one, found by
+ * walking forward with two searches rather than by a lazy pattern.
+ *
+ * `beginbfchar([\s\S]*?)endbfchar` looks for the end from every start, so a map
+ * full of `beginbfchar` with no `endbfchar` after them read to the end of the
+ * source from each one: quadratic, and a few hundred kilobytes of them is
+ * seconds on the one thread this service has. This finds the next opener, then
+ * the next closer after it, yields what is between, and carries on past the
+ * closer — every byte looked at once. An opener with no closer ends it, which
+ * is what the old pattern did too: it simply found no match.
+ */
+function* blocksBetween(source, open, close) {
+  let from = 0;
+
+  for (;;) {
+    const start = source.indexOf(open, from);
+    if (start === -1) return;
+
+    const end = source.indexOf(close, start + open.length);
+    if (end === -1) return;
+
+    yield source.slice(start + open.length, end);
+    from = end + close.length;
+  }
+}
+
+/**
  * @returns {{chars: Map<number, string>, bytes: number}} the mapping, and how
  *   many bytes one code takes in a string that uses it.
  */
 function readCMap(source) {
   const map = new Map();
 
-  for (const block of source.match(/beginbfchar([\s\S]*?)endbfchar/g) ?? []) {
+  for (const block of blocksBetween(source, 'beginbfchar', 'endbfchar')) {
     for (const pair of block.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
       map.set(parseInt(pair[1], 16), fromUtf16Hex(pair[2]));
     }
   }
 
-  for (const block of source.match(/beginbfrange([\s\S]*?)endbfrange/g) ?? []) {
+  for (const block of blocksBetween(source, 'beginbfrange', 'endbfrange')) {
     // Two forms, and Word writes both. `<lo> <hi> <base>` is a run of codes
     // mapping to a run of characters. `<lo> <hi> [<a> <b> …]` gives each code
     // its own, for glyphs that sit side by side in the font and mean characters
@@ -800,8 +868,8 @@ function resolveDict(dict, key, objects) {
  * and its first stream on its own is a partial page. A page with no content at
  * all is a different thing. It is blank, and gives an empty string.
  */
-function contentOf(page, objects) {
-  const parts = page.contents.map((id) => streamOf(objects.get(id)));
+function contentOf(page, objects, budget) {
+  const parts = page.contents.map((id) => streamOf(objects.get(id), budget));
   if (parts.some((one) => one === null)) return null;
 
   return parts.map((bytes) => bytes.toString('latin1')).join('\n');
@@ -811,9 +879,18 @@ function contentOf(page, objects) {
  * A content stream with its strings and inline pictures taken out, leaving the
  * operators and their numbers. An `(f)` shown on a page is a letter and not the
  * operator that fills a shape, and a run of bytes in a picture is neither.
+ *
+ * The close of a literal string is optional here — `\)?`, not `\)`. With it
+ * required, a `(` that never closes made the match fail, and the search tried
+ * again one character along, and did so from every `(` in the stream: 31 KB of
+ * open parentheses took seconds. Optional, an unclosed `(` takes the rest of
+ * the stream in one match and the search moves past it. A real string always
+ * closes, so on every file this ever read the two forms strip exactly the same
+ * bytes; only a file built from unclosed parentheses is treated differently,
+ * and it has no operators left in it to find either way.
  */
 function withoutStrings(content) {
-  return withoutPictures(content).replace(/\((?:\\.|[^\\)])*\)|<[0-9a-fA-F\s]*>/g, ' ');
+  return withoutPictures(content).replace(/\((?:\\.|[^\\)])*\)?|<[0-9a-fA-F\s]*>/g, ' ');
 }
 
 /**
@@ -872,6 +949,18 @@ function withoutPictures(content) {
  * and it is the difference between a table somebody can read and a row of
  * digits run together.
  *
+ * **It reads the stream once.** Each token is found where the last one ended,
+ * and a string or an array is a token in its own right, kept until the operator
+ * that shows it. The reader this replaced coupled the two — it matched
+ * `(…)Tj` and `[…]TJ` as single patterns — and so it looked for the close of a
+ * string, and then the operator, from every `(` and every `[` in the stream. A
+ * `(` that never closed sent that search to the end of the stream, once for
+ * each of them: 31 KB of open parentheses took nearly twenty seconds on the
+ * one thread this service has. Now a `(` with no `)` is one token that takes
+ * the rest of the stream and the scan moves past it, and every byte is looked
+ * at once. A real stream, whose strings and arrays all close, reads exactly as
+ * it did before.
+ *
  * @returns {{text: string, shown: number, missed: number, because: string | null}}
  *   the text; how many of the operators that show text were read to get it,
  *   which the page compares with how many there are; and how many codes could
@@ -894,17 +983,33 @@ function textIn(content, faces) {
   let leading = 0;
   let started = false;
 
+  /**
+   * The last string and the last array seen, each held until the operator that
+   * draws it. A string's or array's close is optional in the patterns below —
+   * `\)?`, `\]?` — so one that never closes is still a single token that
+   * consumes to the end of the stream, rather than a match that fails and is
+   * retried one character along from every opener. `closed` records whether the
+   * close was really there, because only a closed string is drawn, exactly as
+   * the coupled `(…)Tj` pattern required one.
+   */
+  let string = null; // { kind: 'literal' | 'hex', value, closed, end }
+  let array = null; //  { value, closed, end }
+
+  /** True when nothing but whitespace sits between an operand and its operator. */
+  const adjacent = (operand, opIndex) => operand && operand.closed && !/\S/.test(content.slice(operand.end, opIndex));
+
   const tokens = content.matchAll(
     new RegExp(
       [
-        String.raw`/([A-Za-z0-9+.\-_]+)\s+(-?[\d.]+)\s+Tf`, // 1,2
-        String.raw`(-?[\d.]+)\s+TL`, // 3: leading
-        String.raw`(-?[\d.]+)\s+(-?[\d.]+)\s+(Td|TD)`, // 4,5,6: relative move
-        String.raw`(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+Tm`, // 7..12
-        String.raw`(T\*)`, // 13
-        String.raw`\[((?:[^\]\\]|\\.)*)\]\s*TJ`, // 14
-        String.raw`(\((?:\\.|[^\\)])*\))\s*(Tj|')`, // 15,16
-        String.raw`<([0-9a-fA-F\s]*)>\s*(Tj|')`, // 17,18
+        String.raw`\/(?<font>[A-Za-z0-9+.\-_]+)\s+(?<fsize>-?[\d.]+)\s+Tf`,
+        String.raw`(?<tl>-?[\d.]+)\s+TL`,
+        String.raw`(?<tdx>-?[\d.]+)\s+(?<tdy>-?[\d.]+)\s+(?<tdkind>Td|TD)`,
+        String.raw`(?<tma>-?[\d.]+)\s+(?<tmb>-?[\d.]+)\s+(?<tmc>-?[\d.]+)\s+(?<tmd>-?[\d.]+)\s+(?<tmx>-?[\d.]+)\s+(?<tmy>-?[\d.]+)\s+Tm`,
+        String.raw`(?<star>T\*)`,
+        String.raw`\[(?<arr>(?:[^\]\\]|\\.)*)(?<arrc>\])?`,
+        String.raw`\((?<lit>(?:\\.|[^\\)])*)(?<litc>\))?`,
+        String.raw`<(?<hex>[0-9a-fA-F\s]*)>`,
+        String.raw`(?<op>TJ|Tj|')`,
       ].join('|'),
       'g'
     )
@@ -943,77 +1048,85 @@ function textIn(content, faces) {
   }
 
   for (const token of tokens) {
-    const [
-      ,
-      font,
-      fontSize,
-      setLeading,
-      relX,
-      relY,
-      relKind,
-      ,
-      ,
-      ,
-      ,
-      absX,
-      absY,
-      star,
-      kerned,
-      literal,
-      literalOp,
-      hex,
-      hexOp,
-    ] = token;
+    const g = token.groups;
 
-    if (font !== undefined) {
-      face = faces.get(font) ?? { ...NO_FACE, name: `/${font}`, unreadable: 'the page does not define it' };
-      size = Math.abs(Number(fontSize)) || 12;
+    if (g.font !== undefined) {
+      face = faces.get(g.font) ?? { ...NO_FACE, name: `/${g.font}`, unreadable: 'the page does not define it' };
+      size = Math.abs(Number(g.fsize)) || 12;
       continue;
     }
 
-    if (setLeading !== undefined) {
-      leading = Number(setLeading);
+    if (g.tl !== undefined) {
+      leading = Number(g.tl);
       continue;
     }
 
-    if (relX !== undefined) {
-      if (relKind === 'TD') leading = -Number(relY);
-      moveTo(originX + Number(relX), originY + Number(relY));
+    if (g.tdx !== undefined) {
+      if (g.tdkind === 'TD') leading = -Number(g.tdy);
+      moveTo(originX + Number(g.tdx), originY + Number(g.tdy));
       continue;
     }
 
-    if (absX !== undefined) {
-      moveTo(Number(absX), Number(absY));
+    if (g.tmx !== undefined) {
+      moveTo(Number(g.tmx), Number(g.tmy));
       continue;
     }
 
-    if (star !== undefined) {
+    if (g.star !== undefined) {
       moveTo(originX, originY + leading);
       continue;
     }
 
-    // `'` shows text on the next line, which is `T*` and then `Tj`.
-    if (literalOp === "'" || hexOp === "'") moveTo(originX, originY + leading);
-
-    shown += 1;
-
-    if (kerned !== undefined) {
-      for (const part of kerned.matchAll(/<([0-9a-fA-F\s]*)>|(\((?:\\.|[^\\)])*\))|(-?[\d.]+)/g)) {
-        if (part[1] !== undefined) {
-          show(codesInHex(part[1], face.bytes));
-        } else if (part[2] !== undefined) {
-          show(codesInLiteral(part[2], face.composite ? face.bytes : 1));
-        } else {
-          const kern = Number(part[3]);
-          penX -= (kern / 1000) * size;
-          if (kern < -A_KERNED_SPACE && !/\s$/.test(out)) out += ' ';
-        }
-      }
+    if (g.arr !== undefined) {
+      array = { value: g.arr, closed: g.arrc !== undefined, end: token.index + token[0].length };
       continue;
     }
 
-    if (literal !== undefined) show(codesInLiteral(literal, face.composite ? face.bytes : 1));
-    else if (hex !== undefined) show(codesInHex(hex, face.bytes));
+    if (g.lit !== undefined) {
+      string = { kind: 'literal', value: token[0], closed: g.litc !== undefined, end: token.index + token[0].length };
+      continue;
+    }
+
+    if (g.hex !== undefined) {
+      // A hex string is written with its close required, so it is drawn only
+      // when it is whole, the way it always was.
+      string = { kind: 'hex', value: g.hex, closed: true, end: token.index + token[0].length };
+      continue;
+    }
+
+    // A show operator draws the operand right before it, and nothing else. A
+    // `Tj`, `'` or `TJ` with no operand of its own (a `"`, which sets spacing
+    // and is not read here, leaves its string behind like this) draws nothing
+    // and is not counted, so the page's tally of show operators comes out
+    // higher than what was read and the page is set aside — see readPage.
+    if (g.op === 'TJ') {
+      if (adjacent(array, token.index)) {
+        shown += 1;
+        for (const part of array.value.matchAll(/<([0-9a-fA-F\s]*)>|(\((?:\\.|[^\\)])*\))|(-?[\d.]+)/g)) {
+          if (part[1] !== undefined) {
+            show(codesInHex(part[1], face.bytes));
+          } else if (part[2] !== undefined) {
+            show(codesInLiteral(part[2], face.composite ? face.bytes : 1));
+          } else {
+            const kern = Number(part[3]);
+            penX -= (kern / 1000) * size;
+            if (kern < -A_KERNED_SPACE && !/\s$/.test(out)) out += ' ';
+          }
+        }
+      }
+      array = null;
+      continue;
+    }
+
+    // `Tj` or `'`.
+    if (adjacent(string, token.index)) {
+      // `'` shows text on the next line, which is `T*` and then `Tj`.
+      if (g.op === "'") moveTo(originX, originY + leading);
+      shown += 1;
+      if (string.kind === 'literal') show(codesInLiteral(string.value, face.composite ? face.bytes : 1));
+      else show(codesInHex(string.value, face.bytes));
+    }
+    string = null;
   }
 
   return { text: out, shown, missed, because };

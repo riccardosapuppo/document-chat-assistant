@@ -2,7 +2,7 @@
  * The reader's own tests, from the project it is copied from.
  *
  * Every test here is in document-ocr-service's test/pdf-text.test.js at commit
- * 60c706b, unedited but for the path it imports from, so that one added there
+ * 7c7f968, unedited but for the path it imports from, so that one added there
  * can be added here the same way. Left out: the ones that read that project's
  * sample PDFs, which are not in this repository, and the four about how wide a
  * code is, which test/pdf.test.js has had since this repository found that
@@ -10,6 +10,7 @@
  */
 
 import assert from 'node:assert/strict';
+import zlib from 'node:zlib';
 import { describe, it } from 'node:test';
 
 import { readPdfText } from '../src/text/pdf-text.js';
@@ -336,6 +337,53 @@ describe('a file built to be slow, or to break the reader', () => {
     assert.equal(read.text, '');
   });
 
+  it('reads a content stream of unclosed literal strings in one pass, not once per string', () => {
+    // The tokenizer coupled `(…)Tj`, so it looked for the close of a string —
+    // and then the operator — from every `(`. A stream that is all open
+    // parentheses sent that search to the end each time: 31 KB took 4.7 s
+    // before the per-page reading, and about 18 s after it, on this machine.
+    // 120 KB of them would be minutes. It is one forward pass now.
+    const { read, ms } = quickly(() => pdfInFont(HELVETICA, '', { content: '('.repeat(120_000) }));
+
+    assert.ok(ms < 1500, `took ${Math.round(ms)} ms`);
+    assert.equal(read.text, '');
+  });
+
+  it('reads a content stream of unclosed array brackets in one pass', () => {
+    // The same defect in the `[…]TJ` pattern: about 8 s for 40 KB of `[`.
+    const { read, ms } = quickly(() => pdfInFont(HELVETICA, '', { content: '['.repeat(120_000) }));
+
+    assert.ok(ms < 1500, `took ${Math.round(ms)} ms`);
+    assert.equal(read.text, '');
+  });
+
+  it('does not stall on a content stream of deeply nested arrays', () => {
+    // Balanced this time, and just as bad before: every `[` began a scan for a
+    // `]…TJ` that was thousands of characters away. 8.5 s for 40 KB.
+    const { read, ms } = quickly(() =>
+      pdfInFont(HELVETICA, '', { content: '['.repeat(60_000) + ']'.repeat(60_000) })
+    );
+
+    assert.ok(ms < 1500, `took ${Math.round(ms)} ms`);
+    assert.equal(read.text, '');
+  });
+
+  it('reads a ToUnicode map whose bfchar and bfrange blocks never close in one pass', () => {
+    // `beginbfchar([\\s\\S]*?)endbfchar` looked for the end from every start, so
+    // a map full of `beginbfchar` with no `endbfchar` read to the end of the
+    // stream from each of them: quadratic, ~80 ms for 40 KB and four times that
+    // per doubling. Found by two forward searches now.
+    for (const opener of ['beginbfchar', 'beginbfrange']) {
+      const withMap = HELVETICA.replace(' >>', ' /ToUnicode 6 0 R >>');
+      const { read, ms } = quickly(() =>
+        pdfInFont(withMap, '<0001>', { more: [cmapOf([`${opener} `.repeat(30_000)])] })
+      );
+
+      assert.ok(ms < 1500, `${opener} took ${Math.round(ms)} ms`);
+      assert.match(read.why, /codes cannot be turned into characters/);
+    }
+  });
+
   it('does not throw on a page tree with more kids than a call can take as arguments', () => {
     const kids = Array.from({ length: 300_000 }, (_, at) => `${at + 10} 0 R`).join(' ');
     const tree = Buffer.from(
@@ -345,5 +393,84 @@ describe('a file built to be slow, or to break the reader', () => {
     );
 
     assert.doesNotThrow(() => readPdfText(tree));
+  });
+});
+
+/**
+ * Streams built to inflate far past anything this could use.
+ *
+ * A FlateDecode stream says nothing about how large it becomes, and a few
+ * kilobytes of one byte repeated inflate to gigabytes. This reader used to
+ * inflate whatever it was given and measure afterwards, so one small upload
+ * built that way was the whole process's memory and, on the one thread it has,
+ * the whole process's time. Now it stops decompressing at a ceiling — one per
+ * stream, one for the document — while the bytes are being produced, and a
+ * stream that reaches it is set aside as one it cannot decode, the same answer
+ * a stream in a filter this does not undo already gets.
+ *
+ * The fixtures are built here: `Buffer.alloc` gives the flat input for free,
+ * `deflateSync` makes it tiny, and the compressed bytes ride inside the PDF as
+ * latin1, which is a byte-for-byte round trip.
+ */
+describe('a stream built to inflate past the ceiling', () => {
+  /** A one-byte-per-code deflate of `size` bytes, as a latin1 string to embed. */
+  const bomb = (size) => zlib.deflateSync(Buffer.alloc(size, 0x20)).toString('latin1');
+
+  /** A PDF whose pages each carry one FlateDecode content stream from `deflated`. */
+  function pdfOfDeflatedPages(deflated) {
+    const pageId = (at) => 3 + at * 2;
+    const fontId = 3 + deflated.length * 2;
+
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      `<< /Type /Pages /Kids [${deflated.map((_, at) => `${pageId(at)} 0 R`).join(' ')}] /Count ${deflated.length} >>`,
+    ];
+
+    deflated.forEach((bytes, at) => {
+      objects[pageId(at) - 1] =
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ` +
+        `/Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${pageId(at) + 1} 0 R >>`;
+      objects[pageId(at)] = `<< /Filter /FlateDecode /Length ${bytes.length} >>\nstream\n${bytes}\nendstream`;
+    });
+    objects[fontId - 1] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+
+    let out = '%PDF-1.4\n';
+    objects.forEach((body, at) => {
+      out += `${at + 1} 0 obj\n${body}\nendobj\n`;
+    });
+    return Buffer.from(`${out}trailer\n<< /Root 1 0 R >>\n%%EOF`, 'latin1');
+  }
+
+  it('sets a page aside rather than inflating a 64 MB bomb from 64 KB of stream', () => {
+    // 64 MB is past the 32 MB a single stream is allowed, so zlib is stopped in
+    // the middle. Refused, not inflated and then judged, and nowhere near a
+    // crash or a hang: the whole read is milliseconds.
+    const one = bomb(64 * 1024 * 1024);
+    assert.ok(one.length < 200 * 1024, `the compressed stream is ${(one.length / 1024).toFixed(0)} KB`);
+
+    const started = performance.now();
+    const read = readPdfText(pdfOfDeflatedPages([one]));
+    const ms = performance.now() - started;
+
+    assert.ok(ms < 2000, `took ${Math.round(ms)} ms`);
+    assert.equal(read.text, '');
+    assert.deepEqual(read.unread, [{ page: 1, why: 'content this reader cannot decode' }]);
+  });
+
+  it('stops at the document total when many streams each stay under the per-stream ceiling', () => {
+    // Eight streams of 20 MB: each is well under the 32 MB a stream may reach,
+    // so none is refused on its own, but together they pass the 128 MB the
+    // whole document may inflate. The reader takes the pages it can and sets
+    // the rest aside — which is the per-document ceiling doing its work, not
+    // the per-stream one.
+    const twentyMb = bomb(20 * 1024 * 1024);
+    const read = readPdfText(pdfOfDeflatedPages(Array.from({ length: 8 }, () => twentyMb)));
+
+    assert.ok(read.unread.length >= 1, 'the document total was never reached');
+    assert.ok(read.unread.length < 8, 'every stream was refused, so this proves the per-stream limit, not the total');
+    assert.ok(
+      read.unread.every((one) => one.why === 'content this reader cannot decode'),
+      JSON.stringify(read.unread)
+    );
   });
 });
